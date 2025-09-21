@@ -169,7 +169,7 @@ async function processarMensagem(userNumber, userMessage) { // Adicionado async
                 const resposta = "Legal! O que você gostaria de ver?\n\n- Bicicletas\n- Peças e Acessórios";
                 enviarTexto(userNumber, resposta);
                 userStates[userNumber] = { state: 'AWAITING_PRODUCT_CATEGORY' };
-            } else if (msg.startsWith("agendar manutenção")) {
+            } else if (msg.startsWith("agendar serviço")) {
                 const resposta = "Claro! Para qual serviço você gostaria de agendar um horário?\n\n- Revisão completa\n- Manutenção corretiva";
                 enviarTexto(userNumber, resposta);
                 userStates[userNumber] = { state: 'AWAITING_SERVICE_TYPE' };
@@ -286,13 +286,13 @@ async function processarMensagem(userNumber, userMessage) { // Adicionado async
     }
 }
 
-// Função de menu principal atualizada para 3 botões
+// Função de menu principal atualizada para 3 botões com texto corrigido
 function enviarMenuPrincipal(userNumber) {
     const textoBoasVindas = "Olá 🚴, tudo bem?\n\nAqui é a Loja *Rota Ciclo*! Obrigado pelo seu contato 🙌\n\nEscolha uma opção para facilitar seu atendimento:";
     
     const botoesDoMenu = [
         "Ver Produtos 🛍️",
-        "Agendar Manutenção ⚙️",
+        "Agendar Serviço ⚙️", // ALTERADO AQUI
         "Falar com Atendente 👨‍🔧"
     ];
     
