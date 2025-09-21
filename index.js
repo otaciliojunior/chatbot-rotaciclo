@@ -4,35 +4,33 @@ const express = require('express');
 const axios = require('axios');
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
-require('dotenv').config(); // Carrega as variáveis de ambiente do arquivo .env
+const cors = require('cors'); // <-- NOVA ADIÇÃO
+require('dotenv').config();
 
 const app = express();
-app.use(express.json()); // Permite que o express entenda o JSON enviado pela Meta
+app.use(express.json());
+
+// --- CONFIGURAÇÃO DO CORS (NOVA ADIÇÃO) ---
+// Isso permitirá que seu painel (rodando em qualquer lugar) se comunique com o servidor.
+// Para mais segurança no futuro, podemos restringir para aceitar apenas o domínio do seu painel.
+app.use(cors());
 
 // --- INFORMAÇÕES DE CONFIGURAÇÃO ---
-// Buscando as variáveis do arquivo .env ou do ambiente do Render
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 
 // --- INICIALIZAÇÃO DO FIREBASE ---
-// Carrega a chave de serviço do Firebase a partir das variáveis de ambiente
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
 initializeApp({
   credential: cert(serviceAccount)
 });
 const db = getFirestore();
 
-
-// Define a porta em que o servidor vai rodar
 const PORT = process.env.PORT || 3000;
 
 // --- MEMÓRIA E BASE DE DADOS ---
-
-// Objeto para armazenar o estado da conversa de cada usuário
 const userStates = {};
-
-// Simulação de uma base de dados de produtos e serviços
 const database = {
     "estrada": [
         { nome: "Caloi Strada Racing", preco: "R$ 7.500,00" },
@@ -63,13 +61,13 @@ const database = {
 // --- FUNÇÕES DE BANCO DE DADOS ---
 async function salvarAgendamento(userNumber, service, day, time) {
     try {
-        const agendamentoRef = db.collection('agendamentos').doc(); // Cria um novo documento com ID automático
+        const agendamentoRef = db.collection('agendamentos').doc();
         await agendamentoRef.set({
             cliente: userNumber,
             servico: service,
             dia: day,
             horario: time,
-            status: 'pendente', // Status inicial do agendamento
+            status: 'pendente',
             criadoEm: new Date()
         });
         console.log(`[${userNumber}] Agendamento salvo com sucesso no Firestore! ID: ${agendamentoRef.id}`);
@@ -90,10 +88,8 @@ async function criarSolicitacaoAtendimento(userNumber, userName) {
             status: 'aguardando',
             solicitadoEm: new Date()
         };
-
         console.log(`[${userNumber}] Tentando salvar os seguintes dados:`, JSON.stringify(dadosParaSalvar, null, 2));
         await atendimentoRef.set(dadosParaSalvar);
-
         console.log(`[${userNumber}] SUCESSO! Solicitação de atendimento salva no Firestore!`);
         return true;
     } catch (error) {
@@ -107,14 +103,12 @@ app.get('/', (req, res) => {
     res.send('Chatbot da Loja de Bicicletas está no ar!');
 });
 
-// ROTA PARA O PAINEL ENVIAR MENSAGENS (NOVA ADIÇÃO)
+// ROTA PARA O PAINEL ENVIAR MENSAGENS
 app.post('/api/enviar-mensagem', async (req, res) => {
     const { para, texto } = req.body;
-
     if (!para || !texto) {
         return res.status(400).json({ error: "Número do destinatário e texto da mensagem são obrigatórios." });
     }
-
     try {
         await enviarTexto(para, texto);
         res.status(200).json({ success: true, message: "Mensagem enviada com sucesso!" });
@@ -143,8 +137,7 @@ app.all('/webhook', (req, res) => {
             if (data.object === 'whatsapp_business_account' && data.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
                 const messageData = data.entry[0].changes[0].value.messages[0];
                 const fromNumber = messageData.from;
-                const userName = data.entry[0].changes[0].value.contacts[0].profile.name; // Pega o nome do perfil
-
+                const userName = data.entry[0].changes[0].value.contacts[0].profile.name;
                 let messageBody = '';
                 if (messageData.type === 'text') {
                     messageBody = messageData.text.body;
@@ -156,7 +149,6 @@ app.all('/webhook', (req, res) => {
                         messageBody = messageData.interactive.list_reply.title;
                     }
                 }
-
                 if (messageBody) {
                     console.log(`Mensagem de [${fromNumber} - ${userName}] para nosso sistema: "${messageBody}"`);
                     processarMensagem(fromNumber, userName, messageBody);
@@ -173,15 +165,13 @@ app.all('/webhook', (req, res) => {
     }
 });
 
-// Função principal que gerencia o fluxo da conversa (ATUALIZADA)
+// Função principal que gerencia o fluxo da conversa
 async function processarMensagem(userNumber, userName, userMessage) { 
     const msg = userMessage.toLowerCase().trim();
     const currentState = userStates[userNumber]?.state || 'NEW_USER';
-
     console.log(`[${userNumber}] Estado Atual: ${currentState}`);
     console.log(`[${userNumber}] Mensagem Recebida: ${msg}`);
 
-    // Se o usuário está em atendimento humano, o bot não faz nada.
     if (currentState === 'HUMAN_HANDOVER') {
         console.log(`[${userNumber}] Usuário em atendimento humano. Bot ignorando a mensagem.`);
         return;
@@ -197,7 +187,7 @@ async function processarMensagem(userNumber, userName, userMessage) {
         case 'NEW_USER':
             const welcomeMessage = "Olá! 👋 Bem-vindo(a) à *Rota Ciclo*!\n\nEstamos inaugurando nosso novo canal de atendimento automático para te ajudar de forma mais rápida e prática. Por aqui, você já consegue resolver muita coisa!";
             await enviarTexto(userNumber, welcomeMessage);
-            await new Promise(resolve => setTimeout(resolve, 1500)); // Espera 1.5s
+            await new Promise(resolve => setTimeout(resolve, 1500));
             enviarMenuPrincipalComoLista(userNumber);
             break;
 
@@ -218,14 +208,13 @@ async function processarMensagem(userNumber, userName, userMessage) {
                 const resposta = "Entendido. Sua solicitação foi registrada em nossa fila. Em breve um de nossos especialistas entrará em contato por aqui mesmo para continuar o atendimento. Por favor, aguarde.";
                 await enviarTexto(userNumber, resposta);
                 await criarSolicitacaoAtendimento(userNumber, userName);
-                userStates[userNumber] = { state: 'HUMAN_HANDOVER' }; // Pausa o bot
+                userStates[userNumber] = { state: 'HUMAN_HANDOVER' };
             } else {
                 enviarTexto(userNumber, "Opção inválida. Por favor, clique em uma das opções do menu.");
                 enviarMenuPrincipalComoLista(userNumber);
             }
             break;
 
-        // ... (outros cases permanecem os mesmos)
         case 'AWAITING_PRODUCT_CATEGORY':
             if (msg.includes('bicicletas')) {
                 const resposta = "Ótima escolha! 🚴 Temos bicicletas para:\n\n- Estrada\n- MTB (Trilha)\n- Passeio\n\n👉 Me diga qual tipo você procura e já envio algumas opções disponíveis.";
@@ -300,16 +289,13 @@ async function processarMensagem(userNumber, userName, userMessage) {
 
              if (chosenService && chosenDay && database.servicos[chosenService][chosenDay].some(t => time.includes(t.replace(':', 'h')))) {
                 const finalTime = database.servicos[chosenService][chosenDay].find(t => time.includes(t.replace(':', 'h')));
-                
                 const saved = await salvarAgendamento(userNumber, chosenService, chosenDay, finalTime);
-                
                 let resposta = '';
                 if (saved) {
                     resposta = `✅ Agendamento confirmado e registrado!\n\nSeu serviço de *${chosenService}* está marcado para *${chosenDay}-feira* às *${finalTime}*.\n\nObrigado por escolher a Rota Ciclo!`;
                 } else {
                     resposta = `✅ Agendamento confirmado!\n\nSeu serviço de *${chosenService}* está marcado para *${chosenDay}-feira* às *${finalTime}*.\n\n(Não foi possível registrar no nosso sistema. Por favor, guarde esta mensagem como comprovante).`;
                 }
-                
                 enviarTexto(userNumber, resposta);
                 delete userStates[userNumber];
                 setTimeout(() => {
@@ -319,7 +305,6 @@ async function processarMensagem(userNumber, userName, userMessage) {
                  enviarTexto(userNumber, "Desculpe, este horário não está disponível ou foi digitado incorretamente. Por favor, escolha um dos horários que listei.");
              }
              break;
-
 
         default:
             console.log(`Estado desconhecido: ${currentState}. Reiniciando fluxo.`);
@@ -341,16 +326,13 @@ function enviarMenuPrincipalComoLista(userNumber) {
     
     userStates[userNumber] = { state: 'AWAITING_CHOICE' };
     console.log(`[${userNumber}] Estado atualizado para: AWAITING_CHOICE`);
-
     enviarLista(userNumber, textoBoasVindas, "Menu Principal", menuItens);
 }
 
-
 // --- FUNÇÕES DE ENVIO DE MENSAGEM ---
-
 async function enviarPayloadGenerico(payload) {
     const recipientId = payload.to;
-    console.log(`--- TENTANDO ENVIAR MENSAGEM INTERATIVA PARA ${recipientId} ---`);
+    console.log(`--- TENTANDO ENVIAR MENSAGEM PARA ${recipientId} ---`);
     const url = `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`;
     const headers = {
         "Authorization": `Bearer ${META_ACCESS_TOKEN}`,
@@ -405,7 +387,6 @@ async function enviarLista(recipientId, bodyText, buttonText, items) {
     };
     await enviarPayloadGenerico(payload);
 }
-
 
 // Inicia o servidor
 app.listen(PORT, () => {
