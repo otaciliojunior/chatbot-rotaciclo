@@ -170,39 +170,37 @@ app.all('/webhook', (req, res) => {
 async function processarMensagem(userNumber, userName, userMessage) { 
     const msg = userMessage.toLowerCase().trim();
     
-    // --- CORREÇÃO 1: VERIFICAÇÃO DE ESTADO PERSISTENTE ---
-    // Checa a memória local primeiro.
+    // --- VERIFICAÇÃO DE ESTADO PERSISTENTE ---
     let currentState = userStates[userNumber]?.state;
 
-    // Se não encontrar na memória, verifica o Firestore para ver se há um atendimento ativo.
     if (!currentState) {
         try {
             const atendimentoRef = db.collection('atendimentos').doc(userNumber);
             const docSnap = await atendimentoRef.get();
-            if (docSnap.exists() && docSnap.data().status === 'em_atendimento') {
+            
+            // --- CORREÇÃO DA SINTAXE: de docSnap.exists() para docSnap.exists ---
+            if (docSnap.exists && docSnap.data().status === 'em_atendimento') {
                 console.log(`[${userNumber}] Estado recuperado do Firestore: HUMAN_HANDOVER`);
                 currentState = 'HUMAN_HANDOVER';
-                userStates[userNumber] = { state: 'HUMAN_HANDOVER' }; // Atualiza a memória local
+                userStates[userNumber] = { state: 'HUMAN_HANDOVER' };
             }
         } catch (error) {
             console.error(`[${userNumber}] Erro ao buscar estado no Firestore:`, error);
         }
     }
     
-    // Se ainda não houver estado, é um novo usuário.
     currentState = currentState || 'NEW_USER';
     
     console.log(`[${userNumber}] Estado Atual: ${currentState}`);
     console.log(`[${userNumber}] Mensagem Recebida: ${msg}`);
 
-    // --- CORREÇÃO 2: SALVAR MENSAGEM EM ATENDIMENTO HUMANO ---
     // Se o usuário estiver em atendimento, salva a mensagem dele no histórico do chat
     if (currentState === 'HUMAN_HANDOVER') {
         console.log(`[${userNumber}] Usuário em atendimento humano. Encaminhando mensagem para o histórico.`);
         try {
             const messagesRef = db.collection('atendimentos').doc(userNumber).collection('mensagens');
             await messagesRef.add({
-                texto: userMessage, // Salva a mensagem original, sem formatação
+                texto: userMessage,
                 origem: 'cliente',
                 enviadaEm: Timestamp.now()
             });
@@ -437,7 +435,7 @@ async function enviarLista(recipientId, bodyText, buttonText, items) {
     await enviarPayloadGenerico(payload);
 }
 
-// --- NOVO OUVINTE DO FIRESTORE ---
+// --- OUVINTE DO FIRESTORE ---
 function iniciarOuvinteDeAtendimentos() {
     const query = db.collection('atendimentos').where('status', '==', 'resolvido');
 
