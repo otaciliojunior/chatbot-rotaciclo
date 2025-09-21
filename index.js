@@ -15,7 +15,7 @@ const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 // Define a porta em que o servidor vai rodar
 const PORT = process.env.PORT || 3000;
 
-// --- MEMÓRIA E BASE DE DADOS (NOVAS ADIÇÕES) ---
+// --- MEMÓRIA E BASE DE DADOS ---
 
 // Objeto para armazenar o estado da conversa de cada usuário
 const userStates = {};
@@ -94,46 +94,51 @@ app.all('/webhook', (req, res) => {
     }
 });
 
-// Função principal que gerencia o fluxo da conversa (TOTALMENTE REFEITA)
+// Função principal que gerencia o fluxo da conversa (ATUALIZADA)
 function processarMensagem(userNumber, userMessage) {
     const msg = userMessage.toLowerCase().trim();
 
-    // Obtém o estado atual do usuário ou define como 'INITIAL' se for a primeira vez
-    const currentState = userStates[userNumber] || 'INITIAL';
+    // Obtém o estado atual do usuário ou define como 'NEW_USER' se for a primeira vez
+    const currentState = userStates[userNumber]?.state || 'NEW_USER';
     console.log(`[${userNumber}] Estado Atual: ${currentState}`);
     console.log(`[${userNumber}] Mensagem Recebida: ${msg}`);
 
     // Se a qualquer momento o usuário digitar 'menu', 'voltar' ou 'cancelar', reinicia o fluxo
     if (["menu", "voltar", "cancelar"].includes(msg)) {
-        delete userStates[userNumber]; // Limpa o estado do usuário
+        userStates[userNumber] = { state: 'AWAITING_CHOICE' }; // Volta ao estado de aguardar escolha
         enviarMenuPrincipal(userNumber);
         return;
     }
     
     // Lógica baseada no estado atual
     switch (currentState) {
-        case 'INITIAL':
-            // Se o estado é inicial, a única coisa que ele faz é enviar o menu
-            enviarMenuPrincipal(userNumber);
+        case 'NEW_USER':
+            // Envia a mensagem de boas-vindas especial e depois o menu
+            const welcomeMessage = "Olá! 👋 Bem-vindo(a) à *Rota Ciclo*!\n\nEstamos inaugurando nosso novo canal de atendimento automático para te ajudar de forma mais rápida e prática. Por aqui, você já consegue resolver muita coisa!";
+            enviarTexto(userNumber, welcomeMessage);
+            // Espera um pouquinho para as mensagens não chegarem coladas
+            setTimeout(() => {
+                enviarMenuPrincipal(userNumber);
+            }, 1500); // 1.5 segundos
             break;
-            
+
         case 'AWAITING_CHOICE':
             // Após receber o menu, o bot aguarda uma escolha
             if (msg.startsWith("comprar bicicleta")) {
                 console.log('Condição atendida: Opção Comprar Bicicleta.');
                 const resposta = "Ótima escolha! 🚴 Temos bicicletas para:\n\n- Estrada\n- MTB (Trilha)\n- Passeio\n\n👉 Me diga qual tipo você procura e já envio algumas opções disponíveis.";
                 enviarTexto(userNumber, resposta);
-                userStates[userNumber] = 'AWAITING_BIKE_TYPE'; // Atualiza o estado
+                userStates[userNumber] = { state: 'AWAITING_BIKE_TYPE' }; // Atualiza o estado
             } else if (msg.startsWith("peças e acessórios")) {
                 console.log('Condição atendida: Opção Peças e Acessórios.');
                 const resposta = "Legal! Temos câmaras, pneus, capacetes, luvas, roupas e muito mais 🚴.\n\n👉 Digite o que você procura, que já te mostro opções disponíveis.";
                 enviarTexto(userNumber, resposta);
-                userStates[userNumber] = 'AWAITING_PART_TYPE'; // Atualiza o estado
+                userStates[userNumber] = { state: 'AWAITING_PART_TYPE' }; // Atualiza o estado
             } else if (msg.startsWith("endereço e horário")) {
                 console.log('Condição atendida: Opção Endereço e Horário.');
                 const resposta = "📍 *Endereço:* Rua X, nº Y, Bairro Z\n🕒 *Horário:* Segunda a Sexta – 9h às 18h | Sábado – 9h às 13h\n📞 *Telefone:* (xx) xxxx-xxxx\n\nPosso te ajudar com algo mais?";
                 enviarTexto(userNumber, resposta);
-                userStates[userNumber] = 'AWAITING_CHOICE'; // Mantém no menu principal
+                userStates[userNumber] = { state: 'AWAITING_CHOICE' }; // Mantém no menu principal
             } else {
                 console.log('Condição atendida: Opção inválida.');
                 enviarTexto(userNumber, "Opção inválida. Por favor, clique em um dos botões do menu.");
@@ -154,7 +159,7 @@ function processarMensagem(userNumber, userMessage) {
                 });
                 productMessage += "Gostou de alguma? Me diga o nome que te dou mais detalhes. Ou digite 'menu' para voltar.";
                 enviarTexto(userNumber, productMessage);
-                delete userStates[userNumber]; // Limpa o estado para a próxima interação
+                userStates[userNumber] = { state: 'AWAITING_CHOICE' }; // Volta ao menu
                 
             } else {
                 enviarTexto(userNumber, "Não entendi o tipo de bicicleta. Por favor, diga 'Estrada', 'MTB' ou 'Passeio'.");
@@ -165,7 +170,7 @@ function processarMensagem(userNumber, userMessage) {
         case 'AWAITING_PART_TYPE':
             // Lógica para peças pode ser adicionada aqui no futuro
             enviarTexto(userNumber, `Ok, buscando por "${userMessage}"... (Esta funcionalidade será implementada em breve!)\n\nDigite 'menu' para voltar.`);
-            delete userStates[userNumber];
+            userStates[userNumber] = { state: 'AWAITING_CHOICE' }; // Volta ao menu
             break;
 
         default:
@@ -179,7 +184,7 @@ function processarMensagem(userNumber, userMessage) {
 
 // Função de menu principal atualizada para definir o estado do usuário
 function enviarMenuPrincipal(userNumber) {
-    const textoBoasVindas = "Olá 🚴, tudo bem?\n\nAqui é a Loja [Nome da Loja]! Obrigado pelo seu contato 🙌\n\nEscolha uma opção para facilitar seu atendimento:";
+    const textoBoasVindas = "Olá 🚴, tudo bem?\n\nAqui é a Loja *Rota Ciclo*! Obrigado pelo seu contato 🙌\n\nEscolha uma opção para facilitar seu atendimento:";
     
     const botoesDoMenu = [
         "Comprar bicicleta 🚲",
@@ -188,7 +193,7 @@ function enviarMenuPrincipal(userNumber) {
     ];
     
     // Define o estado do usuário para 'aguardando escolha' após enviar o menu
-    userStates[userNumber] = 'AWAITING_CHOICE';
+    userStates[userNumber] = { state: 'AWAITING_CHOICE' };
     console.log(`[${userNumber}] Estado atualizado para: AWAITING_CHOICE`);
 
     enviarBotoes(userNumber, textoBoasVindas, botoesDoMenu);
