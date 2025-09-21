@@ -59,7 +59,7 @@ const database = {
     }
 };
 
-// --- NOVA FUNÇÃO PARA SALVAR AGENDAMENTOS ---
+// --- FUNÇÕES DE BANCO DE DADOS ---
 async function salvarAgendamento(userNumber, service, day, time) {
     try {
         const agendamentoRef = db.collection('agendamentos').doc(); // Cria um novo documento com ID automático
@@ -79,6 +79,27 @@ async function salvarAgendamento(userNumber, service, day, time) {
     }
 }
 
+async function criarSolicitacaoAtendimento(userNumber, userName) {
+    console.log(`[${userNumber}] INICIANDO A FUNÇÃO criarSolicitacaoAtendimento...`);
+    try {
+        const atendimentoRef = db.collection('atendimentos').doc(userNumber);
+        const dadosParaSalvar = {
+            cliente_id: userNumber,
+            cliente_nome: userName,
+            status: 'aguardando',
+            solicitadoEm: new Date()
+        };
+
+        console.log(`[${userNumber}] Tentando salvar os seguintes dados:`, JSON.stringify(dadosParaSalvar, null, 2));
+        await atendimentoRef.set(dadosParaSalvar);
+
+        console.log(`[${userNumber}] SUCESSO! Solicitação de atendimento salva no Firestore!`);
+        return true;
+    } catch (error) {
+        console.error(`[${userNumber}] ERRO CRÍTICO ao salvar solicitação de atendimento no Firestore:`, error);
+        return false;
+    }
+}
 
 // Rota principal para testar se o servidor está no ar
 app.get('/', (req, res) => {
@@ -89,7 +110,6 @@ app.get('/', (req, res) => {
 app.all('/webhook', (req, res) => {
     if (req.method === 'GET') {
         console.log('--- Recebida requisição de VERIFICAÇÃO do Webhook ---');
-        // Processo de verificação da Meta
         if (req.query['hub.verify_token'] === VERIFY_TOKEN) {
             console.log('Token de verificação CORRETO.');
             return res.send(req.query['hub.challenge']);
@@ -100,17 +120,13 @@ app.all('/webhook', (req, res) => {
 
     if (req.method === 'POST') {
         console.log('--- NOVO EVENTO DO WEBHOOK RECEBIDO (POST) ---');
-        console.log('Dados recebidos:', JSON.stringify(req.body, null, 2));
-        
-        // Processa as mensagens recebidas do WhatsApp
         const data = req.body;
         try {
-            // Garante que a estrutura recebida é de uma mensagem do WhatsApp
             if (data.object === 'whatsapp_business_account' && data.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
                 const messageData = data.entry[0].changes[0].value.messages[0];
                 const fromNumber = messageData.from;
+                const userName = data.entry[0].changes[0].value.contacts[0].profile.name; // Pega o nome do perfil
 
-                // Lida com texto, botões e agora LISTAS
                 let messageBody = '';
                 if (messageData.type === 'text') {
                     messageBody = messageData.text.body;
@@ -124,49 +140,47 @@ app.all('/webhook', (req, res) => {
                 }
 
                 if (messageBody) {
-                    console.log(`Mensagem de [${fromNumber}] para nosso sistema: "${messageBody}"`);
-                    // --- AQUI ENTRA A LÓGICA DO SEU FLUXO ---
-                    processarMensagem(fromNumber, messageBody);
+                    console.log(`Mensagem de [${fromNumber} - ${userName}] para nosso sistema: "${messageBody}"`);
+                    processarMensagem(fromNumber, userName, messageBody);
                 } else {
                      console.log('Tipo de mensagem não suportada. Ignorando.');
                 }
-                
             } else {
                 console.log('Evento recebido não é uma mensagem do WhatsApp. Ignorando.');
             }
-
         } catch (error) {
             console.error('--- ERRO AO PROCESSAR DADOS DO WEBHOOK ---', error);
         }
-        
         return res.status(200).send('OK');
     }
 });
 
 // Função principal que gerencia o fluxo da conversa (ATUALIZADA)
-async function processarMensagem(userNumber, userMessage) { // Adicionado async
+async function processarMensagem(userNumber, userName, userMessage) { 
     const msg = userMessage.toLowerCase().trim();
-
-    // Obtém o estado atual do usuário ou define como 'NEW_USER' se for a primeira vez
     const currentState = userStates[userNumber]?.state || 'NEW_USER';
+
     console.log(`[${userNumber}] Estado Atual: ${currentState}`);
     console.log(`[${userNumber}] Mensagem Recebida: ${msg}`);
 
-    // Se a qualquer momento o usuário digitar 'menu', 'voltar' ou 'cancelar', reinicia o fluxo
+    // Se o usuário está em atendimento humano, o bot não faz nada.
+    if (currentState === 'HUMAN_HANDOVER') {
+        console.log(`[${userNumber}] Usuário em atendimento humano. Bot ignorando a mensagem.`);
+        return;
+    }
+
     if (["menu", "voltar", "cancelar"].includes(msg)) {
         delete userStates[userNumber];
         enviarMenuPrincipalComoLista(userNumber);
         return;
     }
     
-    // Lógica baseada no estado atual
     switch (currentState) {
         case 'NEW_USER':
             const welcomeMessage = "Olá! 👋 Bem-vindo(a) à *Rota Ciclo*!\n\nEstamos inaugurando nosso novo canal de atendimento automático para te ajudar de forma mais rápida e prática. Por aqui, você já consegue resolver muita coisa!";
-            enviarTexto(userNumber, welcomeMessage);
-            setTimeout(() => {
-                enviarMenuPrincipalComoLista(userNumber);
-            }, 1500);
+            await enviarTexto(userNumber, welcomeMessage);
+            await new Promise(resolve => setTimeout(resolve, 1500)); // Espera 1.5s
+            enviarMenuPrincipalComoLista(userNumber);
             break;
 
         case 'AWAITING_CHOICE':
@@ -179,19 +193,21 @@ async function processarMensagem(userNumber, userMessage) { // Adicionado async
                 enviarTexto(userNumber, resposta);
                 userStates[userNumber] = { state: 'AWAITING_SERVICE_TYPE' };
             } else if (msg.startsWith("endereço e horário")) {
-                const resposta = "📍 *Endereço:* Rua X, nº Y, Bairro Z\n🕒 *Horário:* Segunda a Sexta – 9h às 18h | Sábado – 9h às 13h\n📞 *Telefone:* (xx) xxxx-xxxx\n\nPosso te ajudar com algo mais?";
+               const resposta = "📍 *Endereço:* Av. Mosenhor Paiva, nº 565\n🕒 *Horário:* Segunda a Sábado – 8h às 17h | Domingo – 7h às 12h\n📞 *Telefone:* (84) 98750-4756\n\nPosso te ajudar com algo mais?";
                 enviarTexto(userNumber, resposta);
                 enviarMenuPrincipalComoLista(userNumber);
             } else if (msg.startsWith("falar com atendente")) {
-                const resposta = "Entendido. Vou te transferir para um de nossos atendentes. Por favor, aguarde um momento.";
-                enviarTexto(userNumber, resposta);
-                delete userStates[userNumber];
+                const resposta = "Entendido. Sua solicitação foi registrada em nossa fila. Em breve um de nossos especialistas entrará em contato por aqui mesmo para continuar o atendimento. Por favor, aguarde.";
+                await enviarTexto(userNumber, resposta);
+                await criarSolicitacaoAtendimento(userNumber, userName);
+                userStates[userNumber] = { state: 'HUMAN_HANDOVER' }; // Pausa o bot
             } else {
                 enviarTexto(userNumber, "Opção inválida. Por favor, clique em uma das opções do menu.");
-                enviarMenuPrincipalComoLista(userNumber); // Reenvia o menu
+                enviarMenuPrincipalComoLista(userNumber);
             }
             break;
 
+        // ... (outros cases permanecem os mesmos)
         case 'AWAITING_PRODUCT_CATEGORY':
             if (msg.includes('bicicletas')) {
                 const resposta = "Ótima escolha! 🚴 Temos bicicletas para:\n\n- Estrada\n- MTB (Trilha)\n- Passeio\n\n👉 Me diga qual tipo você procura e já envio algumas opções disponíveis.";
@@ -286,6 +302,7 @@ async function processarMensagem(userNumber, userMessage) { // Adicionado async
              }
              break;
 
+
         default:
             console.log(`Estado desconhecido: ${currentState}. Reiniciando fluxo.`);
             delete userStates[userNumber];
@@ -294,7 +311,6 @@ async function processarMensagem(userNumber, userMessage) { // Adicionado async
     }
 }
 
-// Função de menu principal AGORA USANDO LISTA
 function enviarMenuPrincipalComoLista(userNumber) {
     const textoBoasVindas = "Olá 🚴, tudo bem?\n\nAqui é a Loja *Rota Ciclo*! Obrigado pelo seu contato 🙌\n\nEscolha uma opção abaixo para facilitar seu atendimento:";
     
@@ -322,13 +338,13 @@ async function enviarPayloadGenerico(payload) {
         "Authorization": `Bearer ${META_ACCESS_TOKEN}`,
         "Content-Type": "application/json"
     };
-    console.log('Payload de envio:', JSON.stringify(payload, null, 2));
-
+    
     try {
         await axios.post(url, payload, { headers: headers });
         console.log(`--- MENSAGEM ENVIADA COM SUCESSO PARA ${recipientId} ---`);
     } catch (error) {
         console.error('--- ERRO AO ENVIAR MENSAGEM PELA API DA META ---');
+        console.error('Payload de envio:', JSON.stringify(payload, null, 2));
         console.error(error.response ? JSON.stringify(error.response.data, null, 2) : error.message);
     }
 }
@@ -345,7 +361,6 @@ async function enviarTexto(recipientId, text) {
     await enviarPayloadGenerico(payload);
 }
 
-// NOVA FUNÇÃO para enviar LISTAS
 async function enviarLista(recipientId, bodyText, buttonText, items) {
     const payload = {
         messaging_product: "whatsapp",
