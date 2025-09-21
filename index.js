@@ -1,3 +1,4 @@
+// Forçando atualização para deploy - 21/09
 // Importa as bibliotecas que instalamos
 const express = require('express');
 const axios = require('axios');
