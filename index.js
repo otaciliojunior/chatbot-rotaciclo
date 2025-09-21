@@ -169,11 +169,33 @@ app.all('/webhook', (req, res) => {
 // Função principal que gerencia o fluxo da conversa
 async function processarMensagem(userNumber, userName, userMessage) { 
     const msg = userMessage.toLowerCase().trim();
-    const currentState = userStates[userNumber]?.state || 'NEW_USER';
+    
+    // --- CORREÇÃO 1: VERIFICAÇÃO DE ESTADO PERSISTENTE ---
+    // Checa a memória local primeiro.
+    let currentState = userStates[userNumber]?.state;
+
+    // Se não encontrar na memória, verifica o Firestore para ver se há um atendimento ativo.
+    if (!currentState) {
+        try {
+            const atendimentoRef = db.collection('atendimentos').doc(userNumber);
+            const docSnap = await atendimentoRef.get();
+            if (docSnap.exists() && docSnap.data().status === 'em_atendimento') {
+                console.log(`[${userNumber}] Estado recuperado do Firestore: HUMAN_HANDOVER`);
+                currentState = 'HUMAN_HANDOVER';
+                userStates[userNumber] = { state: 'HUMAN_HANDOVER' }; // Atualiza a memória local
+            }
+        } catch (error) {
+            console.error(`[${userNumber}] Erro ao buscar estado no Firestore:`, error);
+        }
+    }
+    
+    // Se ainda não houver estado, é um novo usuário.
+    currentState = currentState || 'NEW_USER';
+    
     console.log(`[${userNumber}] Estado Atual: ${currentState}`);
     console.log(`[${userNumber}] Mensagem Recebida: ${msg}`);
 
-    // --- CORREÇÃO: CLIENTE -> ATENDENTE ---
+    // --- CORREÇÃO 2: SALVAR MENSAGEM EM ATENDIMENTO HUMANO ---
     // Se o usuário estiver em atendimento, salva a mensagem dele no histórico do chat
     if (currentState === 'HUMAN_HANDOVER') {
         console.log(`[${userNumber}] Usuário em atendimento humano. Encaminhando mensagem para o histórico.`);
@@ -188,7 +210,7 @@ async function processarMensagem(userNumber, userName, userMessage) {
         } catch (error) {
             console.error(`[${userNumber}] Erro ao salvar mensagem do cliente no histórico:`, error);
         }
-        return; // Finaliza o processamento aqui
+        return; // Finaliza o processamento aqui, impedindo o bot de responder
     }
 
     if (["menu", "voltar", "cancelar"].includes(msg)) {
