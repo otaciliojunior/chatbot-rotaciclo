@@ -107,6 +107,23 @@ app.get('/', (req, res) => {
     res.send('Chatbot da Loja de Bicicletas está no ar!');
 });
 
+// ROTA PARA O PAINEL ENVIAR MENSAGENS (NOVA ADIÇÃO)
+app.post('/api/enviar-mensagem', async (req, res) => {
+    const { para, texto } = req.body;
+
+    if (!para || !texto) {
+        return res.status(400).json({ error: "Número do destinatário e texto da mensagem são obrigatórios." });
+    }
+
+    try {
+        await enviarTexto(para, texto);
+        res.status(200).json({ success: true, message: "Mensagem enviada com sucesso!" });
+    } catch (error) {
+        console.error("Falha ao enviar mensagem pelo painel:", error);
+        res.status(500).json({ error: "Falha ao enviar mensagem pela API da Meta." });
+    }
+});
+
 // Rota do Webhook (GET para verificação, POST para receber mensagens)
 app.all('/webhook', (req, res) => {
     if (req.method === 'GET') {
