@@ -1,11 +1,11 @@
-// index.js ATUALIZADO
+// index.js CORRIGIDO E ATUALIZADO
 
 // Forçando atualização para deploy - 21/09
 // Importa as bibliotecas que instalamos
 const express = require('express');
 const axios = require('axios');
 const { initializeApp, cert } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
+const { getFirestore, Timestamp } = require('firebase-admin/firestore');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -173,9 +173,22 @@ async function processarMensagem(userNumber, userName, userMessage) {
     console.log(`[${userNumber}] Estado Atual: ${currentState}`);
     console.log(`[${userNumber}] Mensagem Recebida: ${msg}`);
 
+    // --- CORREÇÃO: CLIENTE -> ATENDENTE ---
+    // Se o usuário estiver em atendimento, salva a mensagem dele no histórico do chat
     if (currentState === 'HUMAN_HANDOVER') {
-        console.log(`[${userNumber}] Usuário em atendimento humano. Bot ignorando a mensagem.`);
-        return;
+        console.log(`[${userNumber}] Usuário em atendimento humano. Encaminhando mensagem para o histórico.`);
+        try {
+            const messagesRef = db.collection('atendimentos').doc(userNumber).collection('mensagens');
+            await messagesRef.add({
+                texto: userMessage, // Salva a mensagem original, sem formatação
+                origem: 'cliente',
+                enviadaEm: Timestamp.now()
+            });
+            console.log(`[${userNumber}] Mensagem do cliente salva no histórico.`);
+        } catch (error) {
+            console.error(`[${userNumber}] Erro ao salvar mensagem do cliente no histórico:`, error);
+        }
+        return; // Finaliza o processamento aqui
     }
 
     if (["menu", "voltar", "cancelar"].includes(msg)) {
@@ -408,12 +421,10 @@ function iniciarOuvinteDeAtendimentos() {
 
     query.onSnapshot(snapshot => {
         snapshot.docChanges().forEach(change => {
-            // Verifica apenas documentos que foram MODIFICADOS para o status 'resolvido'
             if (change.type === 'modified') {
                 const atendimento = change.doc.data();
                 const userNumber = atendimento.cliente_id;
                 
-                // Se o usuário ainda estiver na nossa memória local, limpe o estado dele
                 if (userStates[userNumber] && userStates[userNumber].state === 'HUMAN_HANDOVER') {
                     console.log(`[${userNumber}] Atendimento encerrado pelo painel. Reativando bot.`);
                     delete userStates[userNumber];
@@ -429,6 +440,6 @@ function iniciarOuvinteDeAtendimentos() {
 // Inicia o servidor
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);
-    iniciarOuvinteDeAtendimentos(); // Inicia o ouvinte quando o servidor sobe
+    iniciarOuvinteDeAtendimentos();
     console.log("Ouvinte de atendimentos do Firestore iniciado com sucesso.");
 });
