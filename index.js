@@ -1,18 +1,18 @@
+// index.js ATUALIZADO
+
 // Forçando atualização para deploy - 21/09
 // Importa as bibliotecas que instalamos
 const express = require('express');
 const axios = require('axios');
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
-const cors = require('cors'); // <-- NOVA ADIÇÃO
+const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
 app.use(express.json());
 
-// --- CONFIGURAÇÃO DO CORS (NOVA ADIÇÃO) ---
-// Isso permitirá que seu painel (rodando em qualquer lugar) se comunique com o servidor.
-// Para mais segurança no futuro, podemos restringir para aceitar apenas o domínio do seu painel.
+// --- CONFIGURAÇÃO DO CORS ---
 app.use(cors());
 
 // --- INFORMAÇÕES DE CONFIGURAÇÃO ---
@@ -78,7 +78,7 @@ async function salvarAgendamento(userNumber, service, day, time) {
     }
 }
 
-async function criarSolicitacaoAtendimento(userNumber, userName) {
+async function criarSolicitacaoAtendimento(userNumber, userName, motivo) {
     console.log(`[${userNumber}] INICIANDO A FUNÇÃO criarSolicitacaoAtendimento...`);
     try {
         const atendimentoRef = db.collection('atendimentos').doc(userNumber);
@@ -86,7 +86,8 @@ async function criarSolicitacaoAtendimento(userNumber, userName) {
             cliente_id: userNumber,
             cliente_nome: userName,
             status: 'aguardando',
-            solicitadoEm: new Date()
+            solicitadoEm: new Date(),
+            motivo: motivo
         };
         console.log(`[${userNumber}] Tentando salvar os seguintes dados:`, JSON.stringify(dadosParaSalvar, null, 2));
         await atendimentoRef.set(dadosParaSalvar);
@@ -205,13 +206,26 @@ async function processarMensagem(userNumber, userName, userMessage) {
                 enviarTexto(userNumber, resposta);
                 enviarMenuPrincipalComoLista(userNumber);
             } else if (msg.startsWith("falar com atendente")) {
-                const resposta = "Entendido. Sua solicitação foi registrada em nossa fila. Em breve um de nossos especialistas entrará em contato por aqui mesmo para continuar o atendimento. Por favor, aguarde.";
+                const resposta = "Entendido. Para agilizar seu atendimento, por favor, *descreva sua dúvida principal em uma única mensagem de texto*.\n\n_(Atenção: não envie áudios, pois não consigo processá-los)._";
                 await enviarTexto(userNumber, resposta);
-                await criarSolicitacaoAtendimento(userNumber, userName);
-                userStates[userNumber] = { state: 'HUMAN_HANDOVER' };
+                userStates[userNumber] = { state: 'AWAITING_HUMAN_REQUEST_REASON' };
             } else {
                 enviarTexto(userNumber, "Opção inválida. Por favor, clique em uma das opções do menu.");
                 enviarMenuPrincipalComoLista(userNumber);
+            }
+            break;
+
+        case 'AWAITING_HUMAN_REQUEST_REASON':
+            const motivo = userMessage;
+            const sucesso = await criarSolicitacaoAtendimento(userNumber, userName, motivo);
+            if (sucesso) {
+                const resposta = "✅ Sua solicitação foi enviada com sucesso! Em breve um de nossos especialistas entrará em contato por aqui mesmo. Por favor, aguarde.";
+                await enviarTexto(userNumber, resposta);
+                userStates[userNumber] = { state: 'HUMAN_HANDOVER' };
+            } else {
+                const resposta = "❌ Ocorreu um erro ao registrar sua solicitação. Por favor, tente novamente mais tarde ou entre em contato pelo nosso telefone: (84) 98750-4756";
+                await enviarTexto(userNumber, resposta);
+                userStates[userNumber] = { state: 'AWAITING_CHOICE' };
             }
             break;
 
@@ -388,7 +402,33 @@ async function enviarLista(recipientId, bodyText, buttonText, items) {
     await enviarPayloadGenerico(payload);
 }
 
+// --- NOVO OUVINTE DO FIRESTORE ---
+function iniciarOuvinteDeAtendimentos() {
+    const query = db.collection('atendimentos').where('status', '==', 'resolvido');
+
+    query.onSnapshot(snapshot => {
+        snapshot.docChanges().forEach(change => {
+            // Verifica apenas documentos que foram MODIFICADOS para o status 'resolvido'
+            if (change.type === 'modified') {
+                const atendimento = change.doc.data();
+                const userNumber = atendimento.cliente_id;
+                
+                // Se o usuário ainda estiver na nossa memória local, limpe o estado dele
+                if (userStates[userNumber] && userStates[userNumber].state === 'HUMAN_HANDOVER') {
+                    console.log(`[${userNumber}] Atendimento encerrado pelo painel. Reativando bot.`);
+                    delete userStates[userNumber];
+                }
+            }
+        });
+    }, err => {
+        console.error("Erro no ouvinte do Firestore:", err);
+    });
+}
+
+
 // Inicia o servidor
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);
+    iniciarOuvinteDeAtendimentos(); // Inicia o ouvinte quando o servidor sobe
+    console.log("Ouvinte de atendimentos do Firestore iniciado com sucesso.");
 });
