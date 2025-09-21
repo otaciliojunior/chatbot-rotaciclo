@@ -165,25 +165,36 @@ async function processarMensagem(userNumber, userMessage) { // Adicionado async
             break;
 
         case 'AWAITING_CHOICE':
-            if (msg.startsWith("comprar bicicleta")) {
-                const resposta = "Ótima escolha! 🚴 Temos bicicletas para:\n\n- Estrada\n- MTB (Trilha)\n- Passeio\n\n👉 Me diga qual tipo você procura e já envio algumas opções disponíveis.";
+            if (msg.startsWith("ver produtos")) {
+                const resposta = "Legal! O que você gostaria de ver?\n\n- Bicicletas\n- Peças e Acessórios";
                 enviarTexto(userNumber, resposta);
-                userStates[userNumber] = { state: 'AWAITING_BIKE_TYPE' };
-            } else if (msg.startsWith("peças e acessórios")) {
-                const resposta = "Legal! Temos câmaras, pneus, capacetes, luvas, roupas e muito mais 🚴.\n\n👉 Digite o que você procura, que já te mostro opções disponíveis.";
-                enviarTexto(userNumber, resposta);
-                userStates[userNumber] = { state: 'AWAITING_PART_TYPE' };
+                userStates[userNumber] = { state: 'AWAITING_PRODUCT_CATEGORY' };
             } else if (msg.startsWith("agendar manutenção")) {
                 const resposta = "Claro! Para qual serviço você gostaria de agendar um horário?\n\n- Revisão completa\n- Manutenção corretiva";
                 enviarTexto(userNumber, resposta);
                 userStates[userNumber] = { state: 'AWAITING_SERVICE_TYPE' };
-            } else if (msg.startsWith("endereço e horário")) {
-                const resposta = "📍 *Endereço:* Rua X, nº Y, Bairro Z\n🕒 *Horário:* Segunda a Sexta – 9h às 18h | Sábado – 9h às 13h\n📞 *Telefone:* (xx) xxxx-xxxx\n\nPosso te ajudar com algo mais?";
+            } else if (msg.startsWith("falar com atendente")) {
+                const resposta = "Entendido. Vou te transferir para um de nossos atendentes. Por favor, aguarde um momento.";
                 enviarTexto(userNumber, resposta);
-                enviarMenuPrincipal(userNumber);
+                // Aqui entraria a lógica para notificar a equipe
+                delete userStates[userNumber];
             } else {
                 enviarTexto(userNumber, "Opção inválida. Por favor, clique em um dos botões do menu.");
                 enviarMenuPrincipal(userNumber);
+            }
+            break;
+
+        case 'AWAITING_PRODUCT_CATEGORY':
+            if (msg.includes('bicicletas')) {
+                const resposta = "Ótima escolha! 🚴 Temos bicicletas para:\n\n- Estrada\n- MTB (Trilha)\n- Passeio\n\n👉 Me diga qual tipo você procura e já envio algumas opções disponíveis.";
+                enviarTexto(userNumber, resposta);
+                userStates[userNumber] = { state: 'AWAITING_BIKE_TYPE' };
+            } else if (msg.includes('peças') || msg.includes('acessórios')) {
+                const resposta = "Legal! Temos câmaras, pneus, capacetes, luvas, roupas e muito mais 🚴.\n\n👉 Digite o que você procura, que já te mostro opções disponíveis.";
+                enviarTexto(userNumber, resposta);
+                userStates[userNumber] = { state: 'AWAITING_PART_TYPE' };
+            } else {
+                 enviarTexto(userNumber, "Não entendi. Por favor, diga 'Bicicletas' ou 'Peças e Acessórios'.");
             }
             break;
 
@@ -220,35 +231,34 @@ async function processarMensagem(userNumber, userMessage) { // Adicionado async
                 const availableDays = Object.keys(database.servicos[serviceType]).join(', ');
                 let resposta = `Perfeito! Para *${serviceType}*, temos horários disponíveis nos seguintes dias: ${availableDays}.\n\nQual dia você prefere?`;
                 enviarTexto(userNumber, resposta);
-                userStates[userNumber] = { state: 'AWAITING_DAY_CHOICE', service: serviceType }; // Salva o serviço escolhido
+                userStates[userNumber] = { state: 'AWAITING_DAY_CHOICE', service: serviceType };
             } else {
                 enviarTexto(userNumber, "Não entendi o serviço. Por favor, diga 'Revisão' ou 'Manutenção'.");
             }
             break;
             
         case 'AWAITING_DAY_CHOICE':
-            const day = msg.split(' ')[0].replace('ç', 'c').replace('á', 'a'); // Normaliza o dia
+            const day = msg.split(' ')[0].replace('ç', 'c').replace('á', 'a');
             const service = userStates[userNumber].service;
 
             if (service && database.servicos[service] && database.servicos[service][day]) {
                 const availableTimes = database.servicos[service][day].join(' / ');
                 let resposta = `Ótimo! Na *${day}-feira*, temos os seguintes horários para *${service}*:\n\n⏰ ${availableTimes}\n\nQual horário você gostaria de agendar?`;
                 enviarTexto(userNumber, resposta);
-                userStates[userNumber] = { state: 'AWAITING_TIME_CHOICE', service: service, day: day }; // Salva o dia
+                userStates[userNumber] = { state: 'AWAITING_TIME_CHOICE', service: service, day: day };
             } else {
                 enviarTexto(userNumber, "Não temos horários para este dia ou o dia foi digitado incorretamente. Por favor, escolha um dos dias disponíveis que informei.");
             }
             break;
             
         case 'AWAITING_TIME_CHOICE':
-             const time = msg.replace(':', 'h'); // Permite que o usuário digite 09:00 ou 09h00
+             const time = msg.replace(':', 'h');
              const chosenService = userStates[userNumber].service;
              const chosenDay = userStates[userNumber].day;
 
              if (chosenService && chosenDay && database.servicos[chosenService][chosenDay].some(t => time.includes(t.replace(':', 'h')))) {
                 const finalTime = database.servicos[chosenService][chosenDay].find(t => time.includes(t.replace(':', 'h')));
                 
-                // Tenta salvar o agendamento no banco de dados
                 const saved = await salvarAgendamento(userNumber, chosenService, chosenDay, finalTime);
                 
                 let resposta = '';
@@ -259,7 +269,7 @@ async function processarMensagem(userNumber, userMessage) { // Adicionado async
                 }
                 
                 enviarTexto(userNumber, resposta);
-                delete userStates[userNumber]; // Finaliza e limpa o estado
+                delete userStates[userNumber];
                 setTimeout(() => {
                     enviarMenuPrincipal(userNumber);
                 }, 3000);
@@ -276,15 +286,14 @@ async function processarMensagem(userNumber, userMessage) { // Adicionado async
     }
 }
 
-// Função de menu principal atualizada para definir o estado do usuário
+// Função de menu principal atualizada para 3 botões
 function enviarMenuPrincipal(userNumber) {
     const textoBoasVindas = "Olá 🚴, tudo bem?\n\nAqui é a Loja *Rota Ciclo*! Obrigado pelo seu contato 🙌\n\nEscolha uma opção para facilitar seu atendimento:";
     
     const botoesDoMenu = [
-        "Comprar bicicleta 🚲",
-        "Peças e acessórios 🛠️",
-        "Agendar Manutenção ⚙️", // NOVA OPÇÃO
-        "Endereço e Horário 🕒"
+        "Ver Produtos 🛍️",
+        "Agendar Manutenção ⚙️",
+        "Falar com Atendente 👨‍🔧"
     ];
     
     userStates[userNumber] = { state: 'AWAITING_CHOICE' };
