@@ -15,6 +15,27 @@ const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 // Define a porta em que o servidor vai rodar
 const PORT = process.env.PORT || 3000;
 
+// --- MEMÓRIA E BASE DE DADOS (NOVAS ADIÇÕES) ---
+
+// Objeto para armazenar o estado da conversa de cada usuário
+const userStates = {};
+
+// Simulação de uma base de dados de produtos
+const database = {
+    "estrada": [
+        { nome: "Caloi Strada Racing", preco: "R$ 7.500,00" },
+        { nome: "Specialized Allez", preco: "R$ 9.200,00" }
+    ],
+    "mtb": [
+        { nome: "Trek Marlin 5", preco: "R$ 4.800,00" },
+        { nome: "Oggi Big Wheel 7.2", preco: "R$ 5.500,00" }
+    ],
+    "passeio": [
+        { nome: "Caloi Urbam", preco: "R$ 2.100,00" },
+        { nome: "Sense Move", preco: "R$ 2.350,00" }
+    ]
+};
+
 // Rota principal para testar se o servidor está no ar
 app.get('/', (req, res) => {
     res.send('Chatbot da Loja de Bicicletas está no ar!');
@@ -73,34 +94,90 @@ app.all('/webhook', (req, res) => {
     }
 });
 
-// Função principal que gerencia o fluxo da conversa (ATUALIZADA PARA BOTÕES)
+// Função principal que gerencia o fluxo da conversa (TOTALMENTE REFEITA)
 function processarMensagem(userNumber, userMessage) {
-    console.log(`Processando a mensagem "${userMessage}" para o menu.`);
-    const msg = userMessage.toLowerCase();
+    const msg = userMessage.toLowerCase().trim();
 
-    if (["oi", "ola", "olá", "começar"].includes(msg)) {
-        console.log('Condição atendida: Saudação. Enviando menu principal.');
+    // Obtém o estado atual do usuário ou define como 'INITIAL' se for a primeira vez
+    const currentState = userStates[userNumber] || 'INITIAL';
+    console.log(`[${userNumber}] Estado Atual: ${currentState}`);
+    console.log(`[${userNumber}] Mensagem Recebida: ${msg}`);
+
+    // Se a qualquer momento o usuário digitar 'menu', 'voltar' ou 'cancelar', reinicia o fluxo
+    if (["menu", "voltar", "cancelar"].includes(msg)) {
+        delete userStates[userNumber]; // Limpa o estado do usuário
         enviarMenuPrincipal(userNumber);
-    } else if (msg.startsWith("comprar bicicleta")) {
-        console.log('Condição atendida: Opção Comprar Bicicleta.');
-        const resposta = "Ótima escolha! 🚴 Temos bicicletas para:\n\n- Estrada\n- MTB (Trilha)\n- Passeio/urbana\n\n👉 Me diga qual tipo você procura e já envio algumas opções disponíveis.";
-        enviarTexto(userNumber, resposta);
-    } else if (msg.startsWith("peças e acessórios")) {
-        console.log('Condição atendida: Opção Peças e Acessórios.');
-        const resposta = "Legal! Temos câmaras, pneus, capacetes, luvas, roupas e muito mais 🚴.\n\n👉 Digite o que você procura, que já te mostro opções disponíveis.";
-        enviarTexto(userNumber, resposta);
-    } else if (msg.startsWith("endereço e horário")) {
-        console.log('Condição atendida: Opção Endereço e Horário.');
-        const resposta = "📍 *Endereço:* Rua X, nº Y, Bairro Z\n🕒 *Horário:* Segunda a Sexta – 9h às 18h | Sábado – 9h às 13h\n📞 *Telefone:* (xx) xxxx-xxxx";
-        enviarTexto(userNumber, resposta);
-    } else {
-        console.log('Condição atendida: Opção inválida.');
-        // Para evitar loops, reenviamos o menu principal se não entendermos a resposta.
-        enviarMenuPrincipal(userNumber);
+        return;
+    }
+    
+    // Lógica baseada no estado atual
+    switch (currentState) {
+        case 'INITIAL':
+            // Se o estado é inicial, a única coisa que ele faz é enviar o menu
+            enviarMenuPrincipal(userNumber);
+            break;
+            
+        case 'AWAITING_CHOICE':
+            // Após receber o menu, o bot aguarda uma escolha
+            if (msg.startsWith("comprar bicicleta")) {
+                console.log('Condição atendida: Opção Comprar Bicicleta.');
+                const resposta = "Ótima escolha! 🚴 Temos bicicletas para:\n\n- Estrada\n- MTB (Trilha)\n- Passeio\n\n👉 Me diga qual tipo você procura e já envio algumas opções disponíveis.";
+                enviarTexto(userNumber, resposta);
+                userStates[userNumber] = 'AWAITING_BIKE_TYPE'; // Atualiza o estado
+            } else if (msg.startsWith("peças e acessórios")) {
+                console.log('Condição atendida: Opção Peças e Acessórios.');
+                const resposta = "Legal! Temos câmaras, pneus, capacetes, luvas, roupas e muito mais 🚴.\n\n👉 Digite o que você procura, que já te mostro opções disponíveis.";
+                enviarTexto(userNumber, resposta);
+                userStates[userNumber] = 'AWAITING_PART_TYPE'; // Atualiza o estado
+            } else if (msg.startsWith("endereço e horário")) {
+                console.log('Condição atendida: Opção Endereço e Horário.');
+                const resposta = "📍 *Endereço:* Rua X, nº Y, Bairro Z\n🕒 *Horário:* Segunda a Sexta – 9h às 18h | Sábado – 9h às 13h\n📞 *Telefone:* (xx) xxxx-xxxx\n\nPosso te ajudar com algo mais?";
+                enviarTexto(userNumber, resposta);
+                userStates[userNumber] = 'AWAITING_CHOICE'; // Mantém no menu principal
+            } else {
+                console.log('Condição atendida: Opção inválida.');
+                enviarTexto(userNumber, "Opção inválida. Por favor, clique em um dos botões do menu.");
+                enviarMenuPrincipal(userNumber); // Reenvia o menu
+            }
+            break;
+
+        case 'AWAITING_BIKE_TYPE':
+            let bikeType = null;
+            if (msg.includes('estrada')) bikeType = 'estrada';
+            if (msg.includes('mtb') || msg.includes('trilha')) bikeType = 'mtb';
+            if (msg.includes('passeio') || msg.includes('urbana')) bikeType = 'passeio';
+
+            if (bikeType && database[bikeType]) {
+                let productMessage = `Aqui estão as opções para bicicletas de *${bikeType.toUpperCase()}*:\n\n`;
+                database[bikeType].forEach(bike => {
+                    productMessage += `🚲 *${bike.nome}*\n   Preço: ${bike.preco}\n\n`;
+                });
+                productMessage += "Gostou de alguma? Me diga o nome que te dou mais detalhes. Ou digite 'menu' para voltar.";
+                enviarTexto(userNumber, productMessage);
+                delete userStates[userNumber]; // Limpa o estado para a próxima interação
+                
+            } else {
+                enviarTexto(userNumber, "Não entendi o tipo de bicicleta. Por favor, diga 'Estrada', 'MTB' ou 'Passeio'.");
+                // Mantém o estado como AWAITING_BIKE_TYPE para nova tentativa
+            }
+            break;
+
+        case 'AWAITING_PART_TYPE':
+            // Lógica para peças pode ser adicionada aqui no futuro
+            enviarTexto(userNumber, `Ok, buscando por "${userMessage}"... (Esta funcionalidade será implementada em breve!)\n\nDigite 'menu' para voltar.`);
+            delete userStates[userNumber];
+            break;
+
+        default:
+            // Caso o estado seja desconhecido, reinicia
+            console.log(`Estado desconhecido: ${currentState}. Reiniciando fluxo.`);
+            delete userStates[userNumber];
+            enviarMenuPrincipal(userNumber);
+            break;
     }
 }
 
-// Função de menu principal ATUALIZADA para usar botões
+// Função de menu principal atualizada para definir o estado do usuário
 function enviarMenuPrincipal(userNumber) {
     const textoBoasVindas = "Olá 🚴, tudo bem?\n\nAqui é a Loja [Nome da Loja]! Obrigado pelo seu contato 🙌\n\nEscolha uma opção para facilitar seu atendimento:";
     
@@ -109,7 +186,11 @@ function enviarMenuPrincipal(userNumber) {
         "Peças e acessórios 🛠️",
         "Endereço e Horário 🕒"
     ];
-                 
+    
+    // Define o estado do usuário para 'aguardando escolha' após enviar o menu
+    userStates[userNumber] = 'AWAITING_CHOICE';
+    console.log(`[${userNumber}] Estado atualizado para: AWAITING_CHOICE`);
+
     enviarBotoes(userNumber, textoBoasVindas, botoesDoMenu);
 }
 
@@ -143,7 +224,7 @@ async function enviarTexto(recipientId, text) {
     }
 }
 
-// NOVA FUNÇÃO para enviar mensagens com BOTÕES
+// Função para enviar mensagens com BOTÕES
 async function enviarBotoes(recipientId, text, buttons) {
     console.log(`--- TENTANDO ENVIAR BOTÕES PARA ${recipientId} ---`);
     const url = `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`;
