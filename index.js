@@ -110,12 +110,17 @@ app.all('/webhook', (req, res) => {
                 const messageData = data.entry[0].changes[0].value.messages[0];
                 const fromNumber = messageData.from;
 
-                // Lida tanto com mensagens de texto quanto com cliques em botões
+                // Lida com texto, botões e agora LISTAS
                 let messageBody = '';
                 if (messageData.type === 'text') {
                     messageBody = messageData.text.body;
-                } else if (messageData.type === 'interactive' && messageData.interactive.type === 'button_reply') {
-                    messageBody = messageData.interactive.button_reply.title;
+                } else if (messageData.type === 'interactive') {
+                    const interactiveType = messageData.interactive.type;
+                    if (interactiveType === 'button_reply') {
+                        messageBody = messageData.interactive.button_reply.title;
+                    } else if (interactiveType === 'list_reply') {
+                        messageBody = messageData.interactive.list_reply.title;
+                    }
                 }
 
                 if (messageBody) {
@@ -123,7 +128,7 @@ app.all('/webhook', (req, res) => {
                     // --- AQUI ENTRA A LÓGICA DO SEU FLUXO ---
                     processarMensagem(fromNumber, messageBody);
                 } else {
-                     console.log('Tipo de mensagem interativa não suportada (ex: lista). Ignorando.');
+                     console.log('Tipo de mensagem não suportada. Ignorando.');
                 }
                 
             } else {
@@ -150,7 +155,7 @@ async function processarMensagem(userNumber, userMessage) { // Adicionado async
     // Se a qualquer momento o usuário digitar 'menu', 'voltar' ou 'cancelar', reinicia o fluxo
     if (["menu", "voltar", "cancelar"].includes(msg)) {
         delete userStates[userNumber];
-        enviarMenuPrincipal(userNumber);
+        enviarMenuPrincipalComoLista(userNumber);
         return;
     }
     
@@ -160,7 +165,7 @@ async function processarMensagem(userNumber, userMessage) { // Adicionado async
             const welcomeMessage = "Olá! 👋 Bem-vindo(a) à *Rota Ciclo*!\n\nEstamos inaugurando nosso novo canal de atendimento automático para te ajudar de forma mais rápida e prática. Por aqui, você já consegue resolver muita coisa!";
             enviarTexto(userNumber, welcomeMessage);
             setTimeout(() => {
-                enviarMenuPrincipal(userNumber);
+                enviarMenuPrincipalComoLista(userNumber);
             }, 1500);
             break;
 
@@ -169,18 +174,21 @@ async function processarMensagem(userNumber, userMessage) { // Adicionado async
                 const resposta = "Legal! O que você gostaria de ver?\n\n- Bicicletas\n- Peças e Acessórios";
                 enviarTexto(userNumber, resposta);
                 userStates[userNumber] = { state: 'AWAITING_PRODUCT_CATEGORY' };
-            } else if (msg.startsWith("agendar serviço")) {
+            } else if (msg.startsWith("agendar manutenção")) {
                 const resposta = "Claro! Para qual serviço você gostaria de agendar um horário?\n\n- Revisão completa\n- Manutenção corretiva";
                 enviarTexto(userNumber, resposta);
                 userStates[userNumber] = { state: 'AWAITING_SERVICE_TYPE' };
+            } else if (msg.startsWith("endereço e horário")) {
+                const resposta = "📍 *Endereço:* Rua X, nº Y, Bairro Z\n🕒 *Horário:* Segunda a Sexta – 9h às 18h | Sábado – 9h às 13h\n📞 *Telefone:* (xx) xxxx-xxxx\n\nPosso te ajudar com algo mais?";
+                enviarTexto(userNumber, resposta);
+                enviarMenuPrincipalComoLista(userNumber);
             } else if (msg.startsWith("falar com atendente")) {
                 const resposta = "Entendido. Vou te transferir para um de nossos atendentes. Por favor, aguarde um momento.";
                 enviarTexto(userNumber, resposta);
-                // Aqui entraria a lógica para notificar a equipe
                 delete userStates[userNumber];
             } else {
-                enviarTexto(userNumber, "Opção inválida. Por favor, clique em um dos botões do menu.");
-                enviarMenuPrincipal(userNumber);
+                enviarTexto(userNumber, "Opção inválida. Por favor, clique em uma das opções do menu.");
+                enviarMenuPrincipalComoLista(userNumber); // Reenvia o menu
             }
             break;
 
@@ -271,7 +279,7 @@ async function processarMensagem(userNumber, userMessage) { // Adicionado async
                 enviarTexto(userNumber, resposta);
                 delete userStates[userNumber];
                 setTimeout(() => {
-                    enviarMenuPrincipal(userNumber);
+                    enviarMenuPrincipalComoLista(userNumber);
                 }, 3000);
              } else {
                  enviarTexto(userNumber, "Desculpe, este horário não está disponível ou foi digitado incorretamente. Por favor, escolha um dos horários que listei.");
@@ -281,44 +289,38 @@ async function processarMensagem(userNumber, userMessage) { // Adicionado async
         default:
             console.log(`Estado desconhecido: ${currentState}. Reiniciando fluxo.`);
             delete userStates[userNumber];
-            enviarMenuPrincipal(userNumber);
+            enviarMenuPrincipalComoLista(userNumber);
             break;
     }
 }
 
-// Função de menu principal atualizada para 3 botões com texto corrigido
-function enviarMenuPrincipal(userNumber) {
-    const textoBoasVindas = "Olá 🚴, tudo bem?\n\nAqui é a Loja *Rota Ciclo*! Obrigado pelo seu contato 🙌\n\nEscolha uma opção para facilitar seu atendimento:";
+// Função de menu principal AGORA USANDO LISTA
+function enviarMenuPrincipalComoLista(userNumber) {
+    const textoBoasVindas = "Olá 🚴, tudo bem?\n\nAqui é a Loja *Rota Ciclo*! Obrigado pelo seu contato 🙌\n\nEscolha uma opção abaixo para facilitar seu atendimento:";
     
-    const botoesDoMenu = [
-        "Ver Produtos 🛍️",
-        "Agendar Serviço ⚙️", // ALTERADO AQUI
-        "Falar com Atendente 👨‍🔧"
+    const menuItens = [
+        { id: "menu_produtos", title: "Ver Produtos 🛍️" },
+        { id: "menu_agendar", title: "Agendar Manutenção ⚙️" },
+        { id: "menu_atendente", title: "Falar com Atendente 👨‍🔧" },
+        { id: "menu_endereco", title: "Endereço e Horário 🕒" }
     ];
     
     userStates[userNumber] = { state: 'AWAITING_CHOICE' };
     console.log(`[${userNumber}] Estado atualizado para: AWAITING_CHOICE`);
 
-    enviarBotoes(userNumber, textoBoasVindas, botoesDoMenu);
+    enviarLista(userNumber, textoBoasVindas, "Menu Principal", menuItens);
 }
 
 
 // --- FUNÇÕES DE ENVIO DE MENSAGEM ---
 
-async function enviarTexto(recipientId, text) {
-    console.log(`--- TENTANDO ENVIAR RESPOSTA PARA ${recipientId} ---`);
+async function enviarPayloadGenerico(payload) {
+    const recipientId = payload.to;
+    console.log(`--- TENTANDO ENVIAR MENSAGEM INTERATIVA PARA ${recipientId} ---`);
     const url = `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`;
     const headers = {
         "Authorization": `Bearer ${META_ACCESS_TOKEN}`,
         "Content-Type": "application/json"
-    };
-    const payload = {
-        messaging_product: "whatsapp",
-        to: recipientId,
-        type: "text",
-        text: {
-            body: text
-        }
     };
     console.log('Payload de envio:', JSON.stringify(payload, null, 2));
 
@@ -331,42 +333,44 @@ async function enviarTexto(recipientId, text) {
     }
 }
 
-async function enviarBotoes(recipientId, text, buttons) {
-    console.log(`--- TENTANDO ENVIAR BOTÕES PARA ${recipientId} ---`);
-    const url = `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`;
-    const headers = {
-        "Authorization": `Bearer ${META_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
+async function enviarTexto(recipientId, text) {
+    const payload = {
+        messaging_product: "whatsapp",
+        to: recipientId,
+        type: "text",
+        text: {
+            body: text
+        }
     };
+    await enviarPayloadGenerico(payload);
+}
+
+// NOVA FUNÇÃO para enviar LISTAS
+async function enviarLista(recipientId, bodyText, buttonText, items) {
     const payload = {
         messaging_product: "whatsapp",
         to: recipientId,
         type: "interactive",
         interactive: {
-            type: "button",
+            type: "list",
             body: {
-                text: text
+                text: bodyText
             },
             action: {
-                buttons: buttons.map((btn, index) => ({
-                    type: "reply",
-                    reply: {
-                        id: `btn_${index + 1}`,
-                        title: btn
+                button: buttonText,
+                sections: [
+                    {
+                        title: "Opções Disponíveis",
+                        rows: items.map(item => ({
+                            id: item.id,
+                            title: item.title,
+                        }))
                     }
-                }))
+                ]
             }
         }
     };
-    console.log('Payload de envio:', JSON.stringify(payload, null, 2));
-
-    try {
-        await axios.post(url, payload, { headers: headers });
-        console.log(`--- BOTÕES ENVIADOS COM SUCESSO PARA ${recipientId} ---`);
-    } catch (error) {
-        console.error('--- ERRO AO ENVIAR BOTÕES PELA API DA META ---');
-        console.error(error.response ? JSON.stringify(error.response.data, null, 2) : error.message);
-    }
+    await enviarPayloadGenerico(payload);
 }
 
 
