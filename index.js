@@ -44,14 +44,25 @@ app.all('/webhook', (req, res) => {
             if (data.object === 'whatsapp_business_account' && data.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
                 const messageData = data.entry[0].changes[0].value.messages[0];
                 const fromNumber = messageData.from;
-                const messageBody = messageData.text.body;
 
-                console.log(`Mensagem de [${fromNumber}] para nosso sistema: "${messageBody}"`);
+                // Lida tanto com mensagens de texto quanto com cliques em botões
+                let messageBody = '';
+                if (messageData.type === 'text') {
+                    messageBody = messageData.text.body;
+                } else if (messageData.type === 'interactive' && messageData.interactive.type === 'button_reply') {
+                    messageBody = messageData.interactive.button_reply.title;
+                }
 
-                // --- AQUI ENTRA A LÓGICA DO SEU FLUXO ---
-                processarMensagem(fromNumber, messageBody);
+                if (messageBody) {
+                    console.log(`Mensagem de [${fromNumber}] para nosso sistema: "${messageBody}"`);
+                    // --- AQUI ENTRA A LÓGICA DO SEU FLUXO ---
+                    processarMensagem(fromNumber, messageBody);
+                } else {
+                     console.log('Tipo de mensagem interativa não suportada (ex: lista). Ignorando.');
+                }
+                
             } else {
-                console.log('Evento recebido não é uma mensagem de texto do WhatsApp. Ignorando.');
+                console.log('Evento recebido não é uma mensagem do WhatsApp. Ignorando.');
             }
 
         } catch (error) {
@@ -62,7 +73,7 @@ app.all('/webhook', (req, res) => {
     }
 });
 
-// Função principal que gerencia o fluxo da conversa
+// Função principal que gerencia o fluxo da conversa (ATUALIZADA PARA BOTÕES)
 function processarMensagem(userNumber, userMessage) {
     console.log(`Processando a mensagem "${userMessage}" para o menu.`);
     const msg = userMessage.toLowerCase();
@@ -70,36 +81,40 @@ function processarMensagem(userNumber, userMessage) {
     if (["oi", "ola", "olá", "começar"].includes(msg)) {
         console.log('Condição atendida: Saudação. Enviando menu principal.');
         enviarMenuPrincipal(userNumber);
-    } else if (userMessage === "1") {
-        console.log('Condição atendida: Opção 1.');
+    } else if (msg.startsWith("comprar bicicleta")) {
+        console.log('Condição atendida: Opção Comprar Bicicleta.');
         const resposta = "Ótima escolha! 🚴 Temos bicicletas para:\n\n- Estrada\n- MTB (Trilha)\n- Passeio/urbana\n\n👉 Me diga qual tipo você procura e já envio algumas opções disponíveis.";
         enviarTexto(userNumber, resposta);
-    } else if (userMessage === "2") {
-        console.log('Condição atendida: Opção 2.');
+    } else if (msg.startsWith("peças e acessórios")) {
+        console.log('Condição atendida: Opção Peças e Acessórios.');
         const resposta = "Legal! Temos câmaras, pneus, capacetes, luvas, roupas e muito mais 🚴.\n\n👉 Digite o que você procura, que já te mostro opções disponíveis.";
         enviarTexto(userNumber, resposta);
-    } else if (userMessage === "4") {
-        console.log('Condição atendida: Opção 4.');
+    } else if (msg.startsWith("endereço e horário")) {
+        console.log('Condição atendida: Opção Endereço e Horário.');
         const resposta = "📍 *Endereço:* Rua X, nº Y, Bairro Z\n🕒 *Horário:* Segunda a Sexta – 9h às 18h | Sábado – 9h às 13h\n📞 *Telefone:* (xx) xxxx-xxxx";
         enviarTexto(userNumber, resposta);
     } else {
         console.log('Condição atendida: Opção inválida.');
-        enviarTexto(userNumber, "Opção inválida. Por favor, escolha um número do menu.");
+        // Para evitar loops, reenviamos o menu principal se não entendermos a resposta.
+        enviarMenuPrincipal(userNumber);
     }
 }
 
+// Função de menu principal ATUALIZADA para usar botões
 function enviarMenuPrincipal(userNumber) {
     const textoBoasVindas = "Olá 🚴, tudo bem?\n\nAqui é a Loja [Nome da Loja]! Obrigado pelo seu contato 🙌\n\nEscolha uma opção para facilitar seu atendimento:";
-    const menu = "1️⃣ Quero comprar uma bicicleta 🚲\n" +
-                 "2️⃣ Preciso de peças ou acessórios 🛠️\n" +
-                 "3️⃣ Revisão ou manutenção ⚙️\n" +
-                 "4️⃣ Endereço e horário de funcionamento 🕒\n" +
-                 "5️⃣ Falar com um atendente 👨‍🔧";
+    
+    const botoesDoMenu = [
+        "Comprar bicicleta 🚲",
+        "Peças e acessórios 🛠️",
+        "Endereço e Horário 🕒"
+    ];
                  
-    enviarTexto(userNumber, textoBoasVindas).then(() => {
-        enviarTexto(userNumber, menu);
-    });
+    enviarBotoes(userNumber, textoBoasVindas, botoesDoMenu);
 }
+
+
+// --- FUNÇÕES DE ENVIO DE MENSAGEM ---
 
 // Função para enviar mensagens de texto via API da Meta usando Axios
 async function enviarTexto(recipientId, text) {
@@ -124,10 +139,49 @@ async function enviarTexto(recipientId, text) {
         console.log(`--- MENSAGEM ENVIADA COM SUCESSO PARA ${recipientId} ---`);
     } catch (error) {
         console.error('--- ERRO AO ENVIAR MENSAGEM PELA API DA META ---');
-        // Log detalhado do erro da API da Meta
         console.error(error.response ? JSON.stringify(error.response.data, null, 2) : error.message);
     }
 }
+
+// NOVA FUNÇÃO para enviar mensagens com BOTÕES
+async function enviarBotoes(recipientId, text, buttons) {
+    console.log(`--- TENTANDO ENVIAR BOTÕES PARA ${recipientId} ---`);
+    const url = `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`;
+    const headers = {
+        "Authorization": `Bearer ${META_ACCESS_TOKEN}`,
+        "Content-Type": "application/json"
+    };
+    const payload = {
+        messaging_product: "whatsapp",
+        to: recipientId,
+        type: "interactive",
+        interactive: {
+            type: "button",
+            body: {
+                text: text
+            },
+            action: {
+                buttons: buttons.map((btn, index) => ({
+                    type: "reply",
+                    reply: {
+                        id: `btn_${index + 1}`,
+                        title: btn
+                    }
+                }))
+            }
+        }
+    };
+    console.log('Payload de envio:', JSON.stringify(payload, null, 2));
+
+    try {
+        await axios.post(url, payload, { headers: headers });
+        console.log(`--- BOTÕES ENVIADOS COM SUCESSO PARA ${recipientId} ---`);
+    } catch (error) {
+        console.error('--- ERRO AO ENVIAR BOTÕES PELA API DA META ---');
+        console.error(error.response ? JSON.stringify(error.response.data, null, 2) : error.message);
+    }
+}
+
 
 // Inicia o servidor
 app.listen(PORT, () => {
