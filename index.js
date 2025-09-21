@@ -1,6 +1,8 @@
 // Importa as bibliotecas que instalamos
 const express = require('express');
 const axios = require('axios');
+const { initializeApp, cert } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
 require('dotenv').config(); // Carrega as variáveis de ambiente do arquivo .env
 
 const app = express();
@@ -12,6 +14,15 @@ const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 
+// --- INICIALIZAÇÃO DO FIREBASE ---
+// Carrega a chave de serviço do Firebase a partir das variáveis de ambiente
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+initializeApp({
+  credential: cert(serviceAccount)
+});
+const db = getFirestore();
+
+
 // Define a porta em que o servidor vai rodar
 const PORT = process.env.PORT || 3000;
 
@@ -20,7 +31,7 @@ const PORT = process.env.PORT || 3000;
 // Objeto para armazenar o estado da conversa de cada usuário
 const userStates = {};
 
-// Simulação de uma base de dados de produtos
+// Simulação de uma base de dados de produtos e serviços
 const database = {
     "estrada": [
         { nome: "Caloi Strada Racing", preco: "R$ 7.500,00" },
@@ -33,8 +44,41 @@ const database = {
     "passeio": [
         { nome: "Caloi Urbam", preco: "R$ 2.100,00" },
         { nome: "Sense Move", preco: "R$ 2.350,00" }
-    ]
+    ],
+    "servicos": {
+        "revisao": {
+            "segunda": ["09:00", "11:00", "14:00"],
+            "terca": ["10:00", "15:00"],
+            "quarta": ["09:00", "11:00", "14:00", "16:00"]
+        },
+        "manutencao": {
+            "segunda": ["10:00", "16:00"],
+            "terca": ["09:00", "11:00", "14:00"],
+            "quarta": ["15:00"]
+        }
+    }
 };
+
+// --- NOVA FUNÇÃO PARA SALVAR AGENDAMENTOS ---
+async function salvarAgendamento(userNumber, service, day, time) {
+    try {
+        const agendamentoRef = db.collection('agendamentos').doc(); // Cria um novo documento com ID automático
+        await agendamentoRef.set({
+            cliente: userNumber,
+            servico: service,
+            dia: day,
+            horario: time,
+            status: 'pendente', // Status inicial do agendamento
+            criadoEm: new Date()
+        });
+        console.log(`[${userNumber}] Agendamento salvo com sucesso no Firestore! ID: ${agendamentoRef.id}`);
+        return true;
+    } catch (error) {
+        console.error(`[${userNumber}] Erro ao salvar agendamento no Firestore:`, error);
+        return false;
+    }
+}
+
 
 // Rota principal para testar se o servidor está no ar
 app.get('/', (req, res) => {
@@ -95,7 +139,7 @@ app.all('/webhook', (req, res) => {
 });
 
 // Função principal que gerencia o fluxo da conversa (ATUALIZADA)
-function processarMensagem(userNumber, userMessage) {
+async function processarMensagem(userNumber, userMessage) { // Adicionado async
     const msg = userMessage.toLowerCase().trim();
 
     // Obtém o estado atual do usuário ou define como 'NEW_USER' se for a primeira vez
@@ -105,7 +149,7 @@ function processarMensagem(userNumber, userMessage) {
 
     // Se a qualquer momento o usuário digitar 'menu', 'voltar' ou 'cancelar', reinicia o fluxo
     if (["menu", "voltar", "cancelar"].includes(msg)) {
-        userStates[userNumber] = { state: 'AWAITING_CHOICE' }; // Volta ao estado de aguardar escolha
+        delete userStates[userNumber];
         enviarMenuPrincipal(userNumber);
         return;
     }
@@ -113,36 +157,33 @@ function processarMensagem(userNumber, userMessage) {
     // Lógica baseada no estado atual
     switch (currentState) {
         case 'NEW_USER':
-            // Envia a mensagem de boas-vindas especial e depois o menu
             const welcomeMessage = "Olá! 👋 Bem-vindo(a) à *Rota Ciclo*!\n\nEstamos inaugurando nosso novo canal de atendimento automático para te ajudar de forma mais rápida e prática. Por aqui, você já consegue resolver muita coisa!";
             enviarTexto(userNumber, welcomeMessage);
-            // Espera um pouquinho para as mensagens não chegarem coladas
             setTimeout(() => {
                 enviarMenuPrincipal(userNumber);
-            }, 1500); // 1.5 segundos
+            }, 1500);
             break;
 
         case 'AWAITING_CHOICE':
-            // Após receber o menu, o bot aguarda uma escolha
             if (msg.startsWith("comprar bicicleta")) {
-                console.log('Condição atendida: Opção Comprar Bicicleta.');
                 const resposta = "Ótima escolha! 🚴 Temos bicicletas para:\n\n- Estrada\n- MTB (Trilha)\n- Passeio\n\n👉 Me diga qual tipo você procura e já envio algumas opções disponíveis.";
                 enviarTexto(userNumber, resposta);
-                userStates[userNumber] = { state: 'AWAITING_BIKE_TYPE' }; // Atualiza o estado
+                userStates[userNumber] = { state: 'AWAITING_BIKE_TYPE' };
             } else if (msg.startsWith("peças e acessórios")) {
-                console.log('Condição atendida: Opção Peças e Acessórios.');
                 const resposta = "Legal! Temos câmaras, pneus, capacetes, luvas, roupas e muito mais 🚴.\n\n👉 Digite o que você procura, que já te mostro opções disponíveis.";
                 enviarTexto(userNumber, resposta);
-                userStates[userNumber] = { state: 'AWAITING_PART_TYPE' }; // Atualiza o estado
+                userStates[userNumber] = { state: 'AWAITING_PART_TYPE' };
+            } else if (msg.startsWith("agendar manutenção")) {
+                const resposta = "Claro! Para qual serviço você gostaria de agendar um horário?\n\n- Revisão completa\n- Manutenção corretiva";
+                enviarTexto(userNumber, resposta);
+                userStates[userNumber] = { state: 'AWAITING_SERVICE_TYPE' };
             } else if (msg.startsWith("endereço e horário")) {
-                console.log('Condição atendida: Opção Endereço e Horário.');
                 const resposta = "📍 *Endereço:* Rua X, nº Y, Bairro Z\n🕒 *Horário:* Segunda a Sexta – 9h às 18h | Sábado – 9h às 13h\n📞 *Telefone:* (xx) xxxx-xxxx\n\nPosso te ajudar com algo mais?";
                 enviarTexto(userNumber, resposta);
-                userStates[userNumber] = { state: 'AWAITING_CHOICE' }; // Mantém no menu principal
+                enviarMenuPrincipal(userNumber);
             } else {
-                console.log('Condição atendida: Opção inválida.');
                 enviarTexto(userNumber, "Opção inválida. Por favor, clique em um dos botões do menu.");
-                enviarMenuPrincipal(userNumber); // Reenvia o menu
+                enviarMenuPrincipal(userNumber);
             }
             break;
 
@@ -159,22 +200,75 @@ function processarMensagem(userNumber, userMessage) {
                 });
                 productMessage += "Gostou de alguma? Me diga o nome que te dou mais detalhes. Ou digite 'menu' para voltar.";
                 enviarTexto(userNumber, productMessage);
-                userStates[userNumber] = { state: 'AWAITING_CHOICE' }; // Volta ao menu
-                
+                userStates[userNumber] = { state: 'AWAITING_CHOICE' };
             } else {
                 enviarTexto(userNumber, "Não entendi o tipo de bicicleta. Por favor, diga 'Estrada', 'MTB' ou 'Passeio'.");
-                // Mantém o estado como AWAITING_BIKE_TYPE para nova tentativa
             }
             break;
 
         case 'AWAITING_PART_TYPE':
-            // Lógica para peças pode ser adicionada aqui no futuro
             enviarTexto(userNumber, `Ok, buscando por "${userMessage}"... (Esta funcionalidade será implementada em breve!)\n\nDigite 'menu' para voltar.`);
-            userStates[userNumber] = { state: 'AWAITING_CHOICE' }; // Volta ao menu
+            userStates[userNumber] = { state: 'AWAITING_CHOICE' };
             break;
 
+        case 'AWAITING_SERVICE_TYPE':
+            let serviceType = null;
+            if (msg.includes('revisão')) serviceType = 'revisao';
+            if (msg.includes('manutenção')) serviceType = 'manutencao';
+
+            if (serviceType) {
+                const availableDays = Object.keys(database.servicos[serviceType]).join(', ');
+                let resposta = `Perfeito! Para *${serviceType}*, temos horários disponíveis nos seguintes dias: ${availableDays}.\n\nQual dia você prefere?`;
+                enviarTexto(userNumber, resposta);
+                userStates[userNumber] = { state: 'AWAITING_DAY_CHOICE', service: serviceType }; // Salva o serviço escolhido
+            } else {
+                enviarTexto(userNumber, "Não entendi o serviço. Por favor, diga 'Revisão' ou 'Manutenção'.");
+            }
+            break;
+            
+        case 'AWAITING_DAY_CHOICE':
+            const day = msg.split(' ')[0].replace('ç', 'c').replace('á', 'a'); // Normaliza o dia
+            const service = userStates[userNumber].service;
+
+            if (service && database.servicos[service] && database.servicos[service][day]) {
+                const availableTimes = database.servicos[service][day].join(' / ');
+                let resposta = `Ótimo! Na *${day}-feira*, temos os seguintes horários para *${service}*:\n\n⏰ ${availableTimes}\n\nQual horário você gostaria de agendar?`;
+                enviarTexto(userNumber, resposta);
+                userStates[userNumber] = { state: 'AWAITING_TIME_CHOICE', service: service, day: day }; // Salva o dia
+            } else {
+                enviarTexto(userNumber, "Não temos horários para este dia ou o dia foi digitado incorretamente. Por favor, escolha um dos dias disponíveis que informei.");
+            }
+            break;
+            
+        case 'AWAITING_TIME_CHOICE':
+             const time = msg.replace(':', 'h'); // Permite que o usuário digite 09:00 ou 09h00
+             const chosenService = userStates[userNumber].service;
+             const chosenDay = userStates[userNumber].day;
+
+             if (chosenService && chosenDay && database.servicos[chosenService][chosenDay].some(t => time.includes(t.replace(':', 'h')))) {
+                const finalTime = database.servicos[chosenService][chosenDay].find(t => time.includes(t.replace(':', 'h')));
+                
+                // Tenta salvar o agendamento no banco de dados
+                const saved = await salvarAgendamento(userNumber, chosenService, chosenDay, finalTime);
+                
+                let resposta = '';
+                if (saved) {
+                    resposta = `✅ Agendamento confirmado e registrado!\n\nSeu serviço de *${chosenService}* está marcado para *${chosenDay}-feira* às *${finalTime}*.\n\nObrigado por escolher a Rota Ciclo!`;
+                } else {
+                    resposta = `✅ Agendamento confirmado!\n\nSeu serviço de *${chosenService}* está marcado para *${chosenDay}-feira* às *${finalTime}*.\n\n(Não foi possível registrar no nosso sistema. Por favor, guarde esta mensagem como comprovante).`;
+                }
+                
+                enviarTexto(userNumber, resposta);
+                delete userStates[userNumber]; // Finaliza e limpa o estado
+                setTimeout(() => {
+                    enviarMenuPrincipal(userNumber);
+                }, 3000);
+             } else {
+                 enviarTexto(userNumber, "Desculpe, este horário não está disponível ou foi digitado incorretamente. Por favor, escolha um dos horários que listei.");
+             }
+             break;
+
         default:
-            // Caso o estado seja desconhecido, reinicia
             console.log(`Estado desconhecido: ${currentState}. Reiniciando fluxo.`);
             delete userStates[userNumber];
             enviarMenuPrincipal(userNumber);
@@ -189,10 +283,10 @@ function enviarMenuPrincipal(userNumber) {
     const botoesDoMenu = [
         "Comprar bicicleta 🚲",
         "Peças e acessórios 🛠️",
+        "Agendar Manutenção ⚙️", // NOVA OPÇÃO
         "Endereço e Horário 🕒"
     ];
     
-    // Define o estado do usuário para 'aguardando escolha' após enviar o menu
     userStates[userNumber] = { state: 'AWAITING_CHOICE' };
     console.log(`[${userNumber}] Estado atualizado para: AWAITING_CHOICE`);
 
@@ -202,7 +296,6 @@ function enviarMenuPrincipal(userNumber) {
 
 // --- FUNÇÕES DE ENVIO DE MENSAGEM ---
 
-// Função para enviar mensagens de texto via API da Meta usando Axios
 async function enviarTexto(recipientId, text) {
     console.log(`--- TENTANDO ENVIAR RESPOSTA PARA ${recipientId} ---`);
     const url = `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`;
@@ -229,7 +322,6 @@ async function enviarTexto(recipientId, text) {
     }
 }
 
-// Função para enviar mensagens com BOTÕES
 async function enviarBotoes(recipientId, text, buttons) {
     console.log(`--- TENTANDO ENVIAR BOTÕES PARA ${recipientId} ---`);
     const url = `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`;
