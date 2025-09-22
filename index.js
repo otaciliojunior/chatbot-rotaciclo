@@ -32,11 +32,11 @@ const PORT = process.env.PORT || 3000;
 // --- MENSAGENS CENTRALIZADAS DO BOT ---
 const botMessages = {
     // --- GERAL ---
-    welcome: "Fala, ciclista! Bem-vindo(a) à *Rota Ciclo*! 🚴‍♂️\n\nEsse é o nosso canal de atendimento automático, feito pra deixar sua vida mais fácil e rápida. Bora começar?",
+    welcome: "Fala, ciclista! Bem-vindo(a) à *Rota Ciclo*! 🚴\n\nEstamos testando nosso novo canal de atendimento automático, que já está bem avançado e preparado pra te ajudar. A ideia é aproximar ainda mais você da nossa loja e criar uma experiência prática e agradável no seu atendimento.\n\nBora começar?",
     invalidOption: "Ops, não entendi essa opção 🤔. Tenta clicar em uma das opções do menu, beleza?",
 
     // --- MENU PRINCIPAL ---
-    mainMenuHeader: "E aí 🚴, tudo certo?\n\nAqui é a *Loja Rota Ciclo*! Valeu demais por falar com a gente 😉\n\nEscolhe uma das opções abaixo pra eu te ajudar mais rápido:",
+    mainMenuHeader: "E aí, tudo certo?\n\nAqui é a *Loja Rota Ciclo*! Valeu demais por falar com a gente 😉\n\nEscolhe uma das opções abaixo pra eu te ajudar mais rápido:",
 
     // --- PRODUTOS ---
     askProductCategory: "Show! Quer dar uma olhada em quê?\n\n- Bicicletas 🚲\n- Peças e Acessórios 🔧",
@@ -52,7 +52,7 @@ const botMessages = {
     // --- AGENDAMENTO ---
     askServiceType: "Claro! Qual serviço você quer agendar?\n\n- Revisão completa 🔧\n- Manutenção corretiva ⚙️",
     invalidServiceType: "Não entendi o serviço 😅. Pode ser 'Revisão' ou 'Manutenção'.",
-    listAvailableDays: (serviceType, availableDays) => `Show! Pra *${serviceType}*, temos horários nos dias: ${availableDays}.\n\n👉 Qual dia você prefere?`,
+    listAvailableDays: (serviceType, availableDays) => `Show! Pra *${serviceType}*, temos horários nos dias: ${availableDays}.\n\nQual dia você prefere?`,
     invalidDay: "Esse dia não tá disponível ou foi digitado errado 🤷. Escolhe um dos que te passei, beleza?",
     listAvailableTimes: (day, service, availableTimes) => `Fechado! Na *${day}-feira* temos esses horários para *${service}*:\n\n⏰ ${availableTimes}\n\n👉 Qual te serve melhor?`,
     invalidTime: "Esse horário não rola 😬. Escolhe um dos que eu te mostrei.",
@@ -62,7 +62,7 @@ const botMessages = {
     // --- ATENDIMENTO HUMANO ---
     requestHumanHandoffReason: "Beleza! Pra agilizar, me conta em uma mensagem só qual é a sua dúvida principal.\n\n_(Obs: não consigo entender áudios, só texto 🫱🏽‍🫲🏽)_",
     humanRequestSuccess: "Pronto! Sua solicitação já tá na fila. Um dos nossos vai falar contigo aqui mesmo, só aguarda um pouquinho 😉.",
-    humanRequestError: "❌ Deu erro ao registrar sua solicitação 😕. Tenta de novo mais tarde ou chama a gente no tel: (84) 98750-4756",
+    humanRequestError: "Deu erro ao registrar sua solicitação 😕. Tenta de novo mais tarde ou chama a gente no (84) 98750-4756",
 
     // --- INFORMAÇÕES GERAIS ---
     addressAndHours: "📍 *Endereço:* Av. Monsenhor Paiva, nº 565\n🕒 *Horário:* Seg a Sáb – 8h às 17h | Dom – 7h às 12h\n📞 *Telefone:* (84) 98750-4756\n\nPosso te ajudar em mais alguma coisa? 🚲"
