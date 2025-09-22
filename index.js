@@ -1,4 +1,4 @@
-// index.js CORRIGIDO E ATUALIZADO
+// index.js CORRIGIDO, ATUALIZADO E REATORADO
 
 // Forçando atualização para deploy - 21/09
 // Importa as bibliotecas que instalamos
@@ -28,6 +28,46 @@ initializeApp({
 const db = getFirestore();
 
 const PORT = process.env.PORT || 3000;
+
+// --- MENSAGENS CENTRALIZADAS DO BOT ---
+const botMessages = {
+    // --- GERAL ---
+    welcome: "Fala, ciclista! Bem-vindo(a) à *Rota Ciclo*! 🚴‍♂️\n\nEsse é o nosso canal de atendimento automático, feito pra deixar sua vida mais fácil e rápida. Bora começar?",
+    invalidOption: "Ops, não entendi essa opção 🤔. Tenta clicar em uma das opções do menu, beleza?",
+
+    // --- MENU PRINCIPAL ---
+    mainMenuHeader: "E aí 🚴, tudo certo?\n\nAqui é a *Loja Rota Ciclo*! Valeu demais por falar com a gente 😉\n\nEscolhe uma das opções abaixo pra eu te ajudar mais rápido:",
+
+    // --- PRODUTOS ---
+    askProductCategory: "Show! Quer dar uma olhada em quê?\n\n- Bicicletas 🚲\n- Peças e Acessórios 🔧",
+    invalidProductCategory: "Hmm, não saquei. Digita 'Bicicletas' ou 'Peças e Acessórios' que eu entendo 😉.",
+    askBikeType: "Boa escolha! 🚴 Temos bikes pra todo tipo de rolê:\n\n- Estrada 🛣️\n- MTB (Trilha) 🌄\n- Passeio 🌳\n\n👉 Qual você procura?",
+    invalidBikeType: "Não entendi o tipo de bike 😅. Tenta 'Estrada', 'MTB' ou 'Passeio'.",
+    askPartType: "Top! Temos de tudo: câmaras, pneus, capacetes, luvas, roupas e muito mais 🚴‍♂️.\n\nMe fala o que você procura que já mostro opções.",
+    searchPart: (searchTerm) => `Beleza, procurando por *${searchTerm}*... 🔎 (Essa função tá chegando em breve!)\n\nSe quiser, digita 'menu' pra voltar.`,
+    bikeListHeader: (bikeType) => `Aqui estão as bikes de *${bikeType.toUpperCase()}* que temos agora:\n\n`,
+    bikeListItem: (bike) => `🚲 *${bike.nome}*\n💰 Preço: ${bike.preco}\n\n`,
+    bikeListFooter: "Curtiu alguma? Me fala o nome que eu te passo mais detalhes. Ou digita 'menu' pra voltar 😉.",
+
+    // --- AGENDAMENTO ---
+    askServiceType: "Claro! Qual serviço você quer agendar?\n\n- Revisão completa 🔧\n- Manutenção corretiva ⚙️",
+    invalidServiceType: "Não entendi o serviço 😅. Pode ser 'Revisão' ou 'Manutenção'.",
+    listAvailableDays: (serviceType, availableDays) => `Show! Pra *${serviceType}*, temos horários nos dias: ${availableDays}.\n\n👉 Qual dia você prefere?`,
+    invalidDay: "Esse dia não tá disponível ou foi digitado errado 🤷. Escolhe um dos que te passei, beleza?",
+    listAvailableTimes: (day, service, availableTimes) => `Fechado! Na *${day}-feira* temos esses horários para *${service}*:\n\n⏰ ${availableTimes}\n\n👉 Qual te serve melhor?`,
+    invalidTime: "Esse horário não rola 😬. Escolhe um dos que eu te mostrei.",
+    bookingSuccessRegistered: (service, day, time) => `✅ Agendamento confirmado!\n\nSeu serviço de *${service}* ficou marcado para *${day}-feira* às *${time}*.\n\nValeu por escolher a Rota Ciclo 🚴‍♂️!`,
+    bookingSuccessUnregistered: (service, day, time) => `✅ Agendamento feito!\n\nSeu serviço de *${service}* ficou marcado para *${day}-feira* às *${time}*.\n\n⚠️ Não consegui registrar no sistema, então guarda essa mensagem como comprovante.`,
+
+    // --- ATENDIMENTO HUMANO ---
+    requestHumanHandoffReason: "Beleza! Pra agilizar, me conta em uma mensagem só qual é a sua dúvida principal.\n\n_(Obs: não consigo entender áudios, só texto 🫱🏽‍🫲🏽)_",
+    humanRequestSuccess: "Pronto! Sua solicitação já tá na fila. Um dos nossos vai falar contigo aqui mesmo, só aguarda um pouquinho 😉.",
+    humanRequestError: "❌ Deu erro ao registrar sua solicitação 😕. Tenta de novo mais tarde ou chama a gente no tel: (84) 98750-4756",
+
+    // --- INFORMAÇÕES GERAIS ---
+    addressAndHours: "📍 *Endereço:* Av. Monsenhor Paiva, nº 565\n🕒 *Horário:* Seg a Sáb – 8h às 17h | Dom – 7h às 12h\n📞 *Telefone:* (84) 98750-4756\n\nPosso te ajudar em mais alguma coisa? 🚲"
+};
+
 
 // --- MEMÓRIA E BASE DE DADOS ---
 const userStates = {};
@@ -219,31 +259,26 @@ async function processarMensagem(userNumber, userName, userMessage) {
     
     switch (currentState) {
         case 'NEW_USER':
-            const welcomeMessage = "Olá! 👋 Bem-vindo(a) à *Rota Ciclo*!\n\nEstamos inaugurando nosso novo canal de atendimento automático para te ajudar de forma mais rápida e prática. Por aqui, você já consegue resolver muita coisa!";
-            await enviarTexto(userNumber, welcomeMessage);
+            await enviarTexto(userNumber, botMessages.welcome);
             await new Promise(resolve => setTimeout(resolve, 1500));
             enviarMenuPrincipalComoLista(userNumber);
             break;
 
         case 'AWAITING_CHOICE':
             if (msg.startsWith("ver produtos")) {
-                const resposta = "Legal! O que você gostaria de ver?\n\n- Bicicletas\n- Peças e Acessórios";
-                enviarTexto(userNumber, resposta);
+                enviarTexto(userNumber, botMessages.askProductCategory);
                 userStates[userNumber] = { state: 'AWAITING_PRODUCT_CATEGORY' };
             } else if (msg.startsWith("agendar manutenção")) {
-                const resposta = "Claro! Para qual serviço você gostaria de agendar um horário?\n\n- Revisão completa\n- Manutenção corretiva";
-                enviarTexto(userNumber, resposta);
+                enviarTexto(userNumber, botMessages.askServiceType);
                 userStates[userNumber] = { state: 'AWAITING_SERVICE_TYPE' };
             } else if (msg.startsWith("endereço e horário")) {
-               const resposta = "📍 *Endereço:* Av. Mosenhor Paiva, nº 565\n🕒 *Horário:* Segunda a Sábado – 8h às 17h | Domingo – 7h às 12h\n📞 *Telefone:* (84) 98750-4756\n\nPosso te ajudar com algo mais?";
-                enviarTexto(userNumber, resposta);
+                enviarTexto(userNumber, botMessages.addressAndHours);
                 enviarMenuPrincipalComoLista(userNumber);
             } else if (msg.startsWith("falar com atendente")) {
-                const resposta = "Entendido. Para agilizar seu atendimento, por favor, *descreva sua dúvida principal em uma única mensagem de texto*.\n\n_(Atenção: não envie áudios, pois não consigo processá-los)._";
-                await enviarTexto(userNumber, resposta);
+                await enviarTexto(userNumber, botMessages.requestHumanHandoffReason);
                 userStates[userNumber] = { state: 'AWAITING_HUMAN_REQUEST_REASON' };
             } else {
-                enviarTexto(userNumber, "Opção inválida. Por favor, clique em uma das opções do menu.");
+                enviarTexto(userNumber, botMessages.invalidOption);
                 enviarMenuPrincipalComoLista(userNumber);
             }
             break;
@@ -252,27 +287,23 @@ async function processarMensagem(userNumber, userName, userMessage) {
             const motivo = userMessage;
             const sucesso = await criarSolicitacaoAtendimento(userNumber, userName, motivo);
             if (sucesso) {
-                const resposta = "✅ Sua solicitação foi enviada com sucesso! Em breve um de nossos especialistas entrará em contato por aqui mesmo. Por favor, aguarde.";
-                await enviarTexto(userNumber, resposta);
+                await enviarTexto(userNumber, botMessages.humanRequestSuccess);
                 userStates[userNumber] = { state: 'HUMAN_HANDOVER' };
             } else {
-                const resposta = "❌ Ocorreu um erro ao registrar sua solicitação. Por favor, tente novamente mais tarde ou entre em contato pelo nosso telefone: (84) 98750-4756";
-                await enviarTexto(userNumber, resposta);
+                await enviarTexto(userNumber, botMessages.humanRequestError);
                 userStates[userNumber] = { state: 'AWAITING_CHOICE' };
             }
             break;
 
         case 'AWAITING_PRODUCT_CATEGORY':
             if (msg.includes('bicicletas')) {
-                const resposta = "Ótima escolha! 🚴 Temos bicicletas para:\n\n- Estrada\n- MTB (Trilha)\n- Passeio\n\n👉 Me diga qual tipo você procura e já envio algumas opções disponíveis.";
-                enviarTexto(userNumber, resposta);
+                enviarTexto(userNumber, botMessages.askBikeType);
                 userStates[userNumber] = { state: 'AWAITING_BIKE_TYPE' };
             } else if (msg.includes('peças') || msg.includes('acessórios')) {
-                const resposta = "Legal! Temos câmaras, pneus, capacetes, luvas, roupas e muito mais 🚴.\n\n👉 Digite o que você procura, que já te mostro opções disponíveis.";
-                enviarTexto(userNumber, resposta);
+                enviarTexto(userNumber, botMessages.askPartType);
                 userStates[userNumber] = { state: 'AWAITING_PART_TYPE' };
             } else {
-                 enviarTexto(userNumber, "Não entendi. Por favor, diga 'Bicicletas' ou 'Peças e Acessórios'.");
+                 enviarTexto(userNumber, botMessages.invalidProductCategory);
             }
             break;
 
@@ -283,20 +314,20 @@ async function processarMensagem(userNumber, userName, userMessage) {
             if (msg.includes('passeio') || msg.includes('urbana')) bikeType = 'passeio';
 
             if (bikeType && database[bikeType]) {
-                let productMessage = `Aqui estão as opções para bicicletas de *${bikeType.toUpperCase()}*:\n\n`;
+                let productMessage = botMessages.bikeListHeader(bikeType);
                 database[bikeType].forEach(bike => {
-                    productMessage += `🚲 *${bike.nome}*\n   Preço: ${bike.preco}\n\n`;
+                    productMessage += botMessages.bikeListItem(bike);
                 });
-                productMessage += "Gostou de alguma? Me diga o nome que te dou mais detalhes. Ou digite 'menu' para voltar.";
+                productMessage += botMessages.bikeListFooter;
                 enviarTexto(userNumber, productMessage);
                 userStates[userNumber] = { state: 'AWAITING_CHOICE' };
             } else {
-                enviarTexto(userNumber, "Não entendi o tipo de bicicleta. Por favor, diga 'Estrada', 'MTB' ou 'Passeio'.");
+                enviarTexto(userNumber, botMessages.invalidBikeType);
             }
             break;
 
         case 'AWAITING_PART_TYPE':
-            enviarTexto(userNumber, `Ok, buscando por "${userMessage}"... (Esta funcionalidade será implementada em breve!)\n\nDigite 'menu' para voltar.`);
+            enviarTexto(userNumber, botMessages.searchPart(userMessage));
             userStates[userNumber] = { state: 'AWAITING_CHOICE' };
             break;
 
@@ -307,11 +338,11 @@ async function processarMensagem(userNumber, userName, userMessage) {
 
             if (serviceType) {
                 const availableDays = Object.keys(database.servicos[serviceType]).join(', ');
-                let resposta = `Perfeito! Para *${serviceType}*, temos horários disponíveis nos seguintes dias: ${availableDays}.\n\nQual dia você prefere?`;
+                let resposta = botMessages.listAvailableDays(serviceType, availableDays);
                 enviarTexto(userNumber, resposta);
                 userStates[userNumber] = { state: 'AWAITING_DAY_CHOICE', service: serviceType };
             } else {
-                enviarTexto(userNumber, "Não entendi o serviço. Por favor, diga 'Revisão' ou 'Manutenção'.");
+                enviarTexto(userNumber, botMessages.invalidServiceType);
             }
             break;
             
@@ -321,11 +352,11 @@ async function processarMensagem(userNumber, userName, userMessage) {
 
             if (service && database.servicos[service] && database.servicos[service][day]) {
                 const availableTimes = database.servicos[service][day].join(' / ');
-                let resposta = `Ótimo! Na *${day}-feira*, temos os seguintes horários para *${service}*:\n\n⏰ ${availableTimes}\n\nQual horário você gostaria de agendar?`;
+                let resposta = botMessages.listAvailableTimes(day, service, availableTimes);
                 enviarTexto(userNumber, resposta);
                 userStates[userNumber] = { state: 'AWAITING_TIME_CHOICE', service: service, day: day };
             } else {
-                enviarTexto(userNumber, "Não temos horários para este dia ou o dia foi digitado incorretamente. Por favor, escolha um dos dias disponíveis que informei.");
+                enviarTexto(userNumber, botMessages.invalidDay);
             }
             break;
             
@@ -339,9 +370,9 @@ async function processarMensagem(userNumber, userName, userMessage) {
                 const saved = await salvarAgendamento(userNumber, chosenService, chosenDay, finalTime);
                 let resposta = '';
                 if (saved) {
-                    resposta = `✅ Agendamento confirmado e registrado!\n\nSeu serviço de *${chosenService}* está marcado para *${chosenDay}-feira* às *${finalTime}*.\n\nObrigado por escolher a Rota Ciclo!`;
+                    resposta = botMessages.bookingSuccessRegistered(chosenService, chosenDay, finalTime);
                 } else {
-                    resposta = `✅ Agendamento confirmado!\n\nSeu serviço de *${chosenService}* está marcado para *${chosenDay}-feira* às *${finalTime}*.\n\n(Não foi possível registrar no nosso sistema. Por favor, guarde esta mensagem como comprovante).`;
+                    resposta = botMessages.bookingSuccessUnregistered(chosenService, chosenDay, finalTime);
                 }
                 enviarTexto(userNumber, resposta);
                 delete userStates[userNumber];
@@ -349,7 +380,7 @@ async function processarMensagem(userNumber, userName, userMessage) {
                     enviarMenuPrincipalComoLista(userNumber);
                 }, 3000);
              } else {
-                 enviarTexto(userNumber, "Desculpe, este horário não está disponível ou foi digitado incorretamente. Por favor, escolha um dos horários que listei.");
+                 enviarTexto(userNumber, botMessages.invalidTime);
              }
              break;
 
@@ -362,7 +393,7 @@ async function processarMensagem(userNumber, userName, userMessage) {
 }
 
 function enviarMenuPrincipalComoLista(userNumber) {
-    const textoBoasVindas = "Olá 🚴, tudo bem?\n\nAqui é a Loja *Rota Ciclo*! Obrigado pelo seu contato 🙌\n\nEscolha uma opção abaixo para facilitar seu atendimento:";
+    const textoBoasVindas = botMessages.mainMenuHeader;
     
     const menuItens = [
         { id: "menu_produtos", title: "Ver Produtos 🛍️" },
