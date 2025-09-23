@@ -36,12 +36,12 @@ const botMessages = {
     invalidOption: "Ops, não entendi essa opção 🤔. Tenta clicar em uma das opções do menu, beleza?",
 
     // --- MENU PRINCIPAL ---
-    mainMenuHeader: "E aí, tudo certo?\n\nAqui é a *Loja Rota Ciclo*! Valeu demais por falar com a gente 😉\n\nEscolhe uma das opções abaixo pra eu te ajudar mais rápido:",
+    mainMenuHeader: "Aqui é a *Loja Rota Ciclo*! Valeu demais por falar com a gente 😉\n\nEscolhe uma das opções abaixo pra eu te ajudar mais rápido:",
 
     // --- PRODUTOS ---
     askProductCategory: "Show! Quer dar uma olhada em quê?\n\n- Bicicletas 🚲\n- Peças e Acessórios 🔧",
     invalidProductCategory: "Hmm, não saquei. Digita 'Bicicletas' ou 'Peças e Acessórios' que eu entendo 😉.",
-    askBikeType: "Boa escolha! 🚴 Temos bikes pra todo tipo de rolê:\n\n- Estrada 🛣️\n- MTB (Trilha) 🌄\n- Passeio 🌳\n\n👉 Qual você procura?",
+    askBikeType: "Boa escolha! 🚴 Temos bikes pra todo tipo de rolê. Qual categoria você procura?",
     invalidBikeType: "Não entendi o tipo de bike 😅. Tenta 'Estrada', 'MTB' ou 'Passeio'.",
     askPartType: "Top! Temos de tudo: câmaras, pneus, capacetes, luvas, roupas e muito mais 🚴‍♂️.\n\nMe fala o que você procura que já mostro opções.",
     searchPart: (searchTerm) => `Beleza, procurando por *${searchTerm}*... 🔎 (Essa função tá chegando em breve!)\n\nSe quiser, digita 'menu' pra voltar.`,
@@ -50,7 +50,8 @@ const botMessages = {
     bikeListFooter: "Curtiu alguma? Me fala o nome que eu te passo mais detalhes. Ou digita 'menu' pra voltar 😉.",
 
     // --- AGENDAMENTO ---
-    askServiceType: "Claro! Qual serviço você quer agendar?\n\n- Revisão completa 🔧\n- Manutenção corretiva ⚙️",
+    askServiceType: "Claro! Qual serviço você quer agendar?",
+    correctiveMaintenanceHandoff: "Entendi, manutenção corretiva. Para te ajudar melhor, me descreva com detalhes o problema que sua bike está apresentando. Vou encaminhar seu caso para um de nossos especialistas.",
     invalidServiceType: "Não entendi o serviço 😅. Pode ser 'Revisão' ou 'Manutenção'.",
     listAvailableDays: (serviceType, availableDays) => `Show! Pra *${serviceType}*, temos horários nos dias: ${availableDays}.\n\nQual dia você prefere?`,
     invalidDay: "Esse dia não tá disponível ou foi digitado errado 🤷. Escolhe um dos que te passei, beleza?",
@@ -185,7 +186,7 @@ app.all('/webhook', (req, res) => {
                 } else if (messageData.type === 'interactive') {
                     const interactiveType = messageData.interactive.type;
                     if (interactiveType === 'button_reply') {
-                        messageBody = messageData.interactive.button_reply.title;
+                        messageBody = messageData.interactive.button_reply.id;
                     } else if (interactiveType === 'list_reply') {
                         messageBody = messageData.interactive.list_reply.title;
                     }
@@ -208,9 +209,8 @@ app.all('/webhook', (req, res) => {
 
 // Função principal que gerencia o fluxo da conversa
 async function processarMensagem(userNumber, userName, userMessage) { 
-    const msg = userMessage.toLowerCase().trim();
+    const msg = typeof userMessage === 'string' ? userMessage.toLowerCase().trim() : userMessage;
     
-    // --- VERIFICAÇÃO DE ESTADO PERSISTENTE ---
     let currentState = userStates[userNumber]?.state;
 
     if (!currentState) {
@@ -218,7 +218,6 @@ async function processarMensagem(userNumber, userName, userMessage) {
             const atendimentoRef = db.collection('atendimentos').doc(userNumber);
             const docSnap = await atendimentoRef.get();
             
-            // --- CORREÇÃO DA SINTAXE: de docSnap.exists() para docSnap.exists ---
             if (docSnap.exists && docSnap.data().status === 'em_atendimento') {
                 console.log(`[${userNumber}] Estado recuperado do Firestore: HUMAN_HANDOVER`);
                 currentState = 'HUMAN_HANDOVER';
@@ -234,7 +233,6 @@ async function processarMensagem(userNumber, userName, userMessage) {
     console.log(`[${userNumber}] Estado Atual: ${currentState}`);
     console.log(`[${userNumber}] Mensagem Recebida: ${msg}`);
 
-    // Se o usuário estiver em atendimento, salva a mensagem dele no histórico do chat
     if (currentState === 'HUMAN_HANDOVER') {
         console.log(`[${userNumber}] Usuário em atendimento humano. Encaminhando mensagem para o histórico.`);
         try {
@@ -248,7 +246,7 @@ async function processarMensagem(userNumber, userName, userMessage) {
         } catch (error) {
             console.error(`[${userNumber}] Erro ao salvar mensagem do cliente no histórico:`, error);
         }
-        return; // Finaliza o processamento aqui, impedindo o bot de responder
+        return;
     }
 
     if (["menu", "voltar", "cancelar"].includes(msg)) {
@@ -265,15 +263,32 @@ async function processarMensagem(userNumber, userName, userMessage) {
             break;
 
         case 'AWAITING_CHOICE':
-            if (msg.startsWith("ver produtos")) {
-                enviarTexto(userNumber, botMessages.askProductCategory);
-                userStates[userNumber] = { state: 'AWAITING_PRODUCT_CATEGORY' };
-            } else if (msg.startsWith("agendar manutenção")) {
-                enviarTexto(userNumber, botMessages.askServiceType);
+            if (msg.startsWith("promoções criativas")) {
+                enviarTexto(userNumber, "Em breve, nossas melhores promoções estarão aqui! 🎁");
+                userStates[userNumber] = { state: 'AWAITING_CHOICE' };
+            } else if (msg.startsWith("bicicletas (produtos)")) {
+                const botoesBike = [
+                    { id: "bike_estrada", title: "Estrada 🛣️" },
+                    { id: "bike_mtb", title: "MTB (Trilha) 🌄" },
+                    { id: "bike_passeio", title: "Passeio 🌳" }
+                ];
+                enviarBotoes(userNumber, botMessages.askBikeType, botoesBike);
+                userStates[userNumber] = { state: 'AWAITING_BIKE_TYPE' };
+            } else if (msg.startsWith("peças e acessórios")) {
+                const textoPecas = "Nosso catálogo digital de peças e acessórios está quase pronto! 🚀\n\nEnquanto isso, que tal falar com um de nossos vendedores? Eles podem te mandar fotos e preços do que você precisa agora mesmo.";
+                const botoesPecas = [
+                    { id: "pecas_atendente", title: "Falar com vendedor" },
+                    { id: "pecas_voltar", title: "Voltar ao Menu" }
+                ];
+                enviarBotoes(userNumber, textoPecas, botoesPecas);
+                userStates[userNumber] = { state: 'AWAITING_PART_ACTION' };
+            } else if (msg.startsWith("revisão / agendamento")) {
+                const botoesServico = [
+                    { id: "servico_revisao", title: "Revisão completa 🔧" },
+                    { id: "servico_manutencao", title: "Manutenção corretiva ⚙️" }
+                ];
+                enviarBotoes(userNumber, botMessages.askServiceType, botoesServico);
                 userStates[userNumber] = { state: 'AWAITING_SERVICE_TYPE' };
-            } else if (msg.startsWith("endereço e horário")) {
-                enviarTexto(userNumber, botMessages.addressAndHours);
-                enviarMenuPrincipalComoLista(userNumber);
             } else if (msg.startsWith("falar com atendente")) {
                 await enviarTexto(userNumber, botMessages.requestHumanHandoffReason);
                 userStates[userNumber] = { state: 'AWAITING_HUMAN_REQUEST_REASON' };
@@ -295,54 +310,62 @@ async function processarMensagem(userNumber, userName, userMessage) {
             }
             break;
 
-        case 'AWAITING_PRODUCT_CATEGORY':
-            if (msg.includes('bicicletas')) {
-                enviarTexto(userNumber, botMessages.askBikeType);
-                userStates[userNumber] = { state: 'AWAITING_BIKE_TYPE' };
-            } else if (msg.includes('peças') || msg.includes('acessórios')) {
-                enviarTexto(userNumber, botMessages.askPartType);
-                userStates[userNumber] = { state: 'AWAITING_PART_TYPE' };
-            } else {
-                 enviarTexto(userNumber, botMessages.invalidProductCategory);
-            }
-            break;
-
         case 'AWAITING_BIKE_TYPE':
             let bikeType = null;
-            if (msg.includes('estrada')) bikeType = 'estrada';
-            if (msg.includes('mtb') || msg.includes('trilha')) bikeType = 'mtb';
-            if (msg.includes('passeio') || msg.includes('urbana')) bikeType = 'passeio';
-
+            if (msg === 'bike_estrada') bikeType = 'estrada';
+            if (msg === 'bike_mtb') bikeType = 'mtb';
+            if (msg === 'bike_passeio') bikeType = 'passeio';
+        
             if (bikeType && database[bikeType]) {
                 let productMessage = botMessages.bikeListHeader(bikeType);
                 database[bikeType].forEach(bike => {
                     productMessage += botMessages.bikeListItem(bike);
                 });
                 productMessage += botMessages.bikeListFooter;
-                enviarTexto(userNumber, productMessage);
-                userStates[userNumber] = { state: 'AWAITING_CHOICE' };
+                await enviarTexto(userNumber, productMessage);
+                setTimeout(() => {
+                    enviarMenuPrincipalComoLista(userNumber);
+                }, 2000);
             } else {
-                enviarTexto(userNumber, botMessages.invalidBikeType);
+                await enviarTexto(userNumber, botMessages.invalidOption);
+                const botoesBike = [
+                    { id: "bike_estrada", title: "Estrada 🛣️" },
+                    { id: "bike_mtb", title: "MTB (Trilha) 🌄" },
+                    { id: "bike_passeio", title: "Passeio 🌳" }
+                ];
+                enviarBotoes(userNumber, botMessages.askBikeType, botoesBike);
             }
             break;
 
-        case 'AWAITING_PART_TYPE':
-            enviarTexto(userNumber, botMessages.searchPart(userMessage));
-            userStates[userNumber] = { state: 'AWAITING_CHOICE' };
+        case 'AWAITING_PART_ACTION':
+            if (msg === 'pecas_atendente') {
+                await enviarTexto(userNumber, botMessages.requestHumanHandoffReason);
+                userStates[userNumber] = { state: 'AWAITING_HUMAN_REQUEST_REASON' };
+            } else if (msg === 'pecas_voltar') {
+                enviarMenuPrincipalComoLista(userNumber);
+            } else {
+                enviarTexto(userNumber, botMessages.invalidOption);
+                enviarMenuPrincipalComoLista(userNumber);
+            }
             break;
 
         case 'AWAITING_SERVICE_TYPE':
-            let serviceType = null;
-            if (msg.includes('revisão')) serviceType = 'revisao';
-            if (msg.includes('manutenção')) serviceType = 'manutencao';
-
-            if (serviceType) {
+            if (msg === 'servico_revisao') {
+                const serviceType = 'revisao';
                 const availableDays = Object.keys(database.servicos[serviceType]).join(', ');
-                let resposta = botMessages.listAvailableDays(serviceType, availableDays);
-                enviarTexto(userNumber, resposta);
+                const resposta = botMessages.listAvailableDays(serviceType, availableDays);
+                await enviarTexto(userNumber, resposta);
                 userStates[userNumber] = { state: 'AWAITING_DAY_CHOICE', service: serviceType };
+            } else if (msg === 'servico_manutencao') {
+                await enviarTexto(userNumber, botMessages.correctiveMaintenanceHandoff);
+                userStates[userNumber] = { state: 'AWAITING_HUMAN_REQUEST_REASON' };
             } else {
-                enviarTexto(userNumber, botMessages.invalidServiceType);
+                enviarTexto(userNumber, botMessages.invalidOption);
+                const botoesServico = [
+                    { id: "servico_revisao", title: "Revisão completa 🔧" },
+                    { id: "servico_manutencao", title: "Manutenção corretiva ⚙️" }
+                ];
+                enviarBotoes(userNumber, botMessages.askServiceType, botoesServico);
             }
             break;
             
@@ -353,10 +376,10 @@ async function processarMensagem(userNumber, userName, userMessage) {
             if (service && database.servicos[service] && database.servicos[service][day]) {
                 const availableTimes = database.servicos[service][day].join(' / ');
                 let resposta = botMessages.listAvailableTimes(day, service, availableTimes);
-                enviarTexto(userNumber, resposta);
+                await enviarTexto(userNumber, resposta);
                 userStates[userNumber] = { state: 'AWAITING_TIME_CHOICE', service: service, day: day };
             } else {
-                enviarTexto(userNumber, botMessages.invalidDay);
+                await enviarTexto(userNumber, botMessages.invalidDay);
             }
             break;
             
@@ -374,13 +397,13 @@ async function processarMensagem(userNumber, userName, userMessage) {
                 } else {
                     resposta = botMessages.bookingSuccessUnregistered(chosenService, chosenDay, finalTime);
                 }
-                enviarTexto(userNumber, resposta);
+                await enviarTexto(userNumber, resposta);
                 delete userStates[userNumber];
                 setTimeout(() => {
                     enviarMenuPrincipalComoLista(userNumber);
                 }, 3000);
              } else {
-                 enviarTexto(userNumber, botMessages.invalidTime);
+                 await enviarTexto(userNumber, botMessages.invalidTime);
              }
              break;
 
@@ -396,10 +419,11 @@ function enviarMenuPrincipalComoLista(userNumber) {
     const textoBoasVindas = botMessages.mainMenuHeader;
     
     const menuItens = [
-        { id: "menu_produtos", title: "Ver Produtos 🛍️" },
-        { id: "menu_agendar", title: "Agendar Manutenção ⚙️" },
-        { id: "menu_atendente", title: "Falar com Atendente 👨‍🔧" },
-        { id: "menu_endereco", title: "Endereço e Horário 🕒" }
+        { id: "menu_promocoes", title: "Promoções Criativas 🎁" },
+        { id: "menu_produtos", title: "Bicicletas (Produtos) 🚲" },
+        { id: "menu_pecas", title: "Peças e Acessórios 🔧" },
+        { id: "menu_agendamento", title: "Revisão / Agendamento ⚙️" },
+        { id: "menu_atendente", title: "Falar com Atendente 👨‍🔧" }
     ];
     
     userStates[userNumber] = { state: 'AWAITING_CHOICE' };
@@ -460,6 +484,30 @@ async function enviarLista(recipientId, bodyText, buttonText, items) {
                         }))
                     }
                 ]
+            }
+        }
+    };
+    await enviarPayloadGenerico(payload);
+}
+
+async function enviarBotoes(recipientId, bodyText, buttons) {
+    const payload = {
+        messaging_product: "whatsapp",
+        to: recipientId,
+        type: "interactive",
+        interactive: {
+            type: "button",
+            body: {
+                text: bodyText
+            },
+            action: {
+                buttons: buttons.map(btn => ({
+                    type: "reply",
+                    reply: {
+                        id: btn.id,
+                        title: btn.title
+                    }
+                }))
             }
         }
     };
