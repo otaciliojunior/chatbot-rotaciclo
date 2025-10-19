@@ -1,0 +1,22 @@
+{
+  "name": "rotaciclo",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy": "gcloud functions deploy rotaciclo-bot-webhook --runtime nodejs20 --trigger-http --allow-unauthenticated --entry-point=rotacicloBot --project=rotaciclo --region=us-central1 --service-account=490741633811-compute@developer.gserviceaccount.com --set-env-vars=\"META_ACCESS_TOKEN=EAAZB8FykdZADcBPh02ASAG4PvRyof9tehkOOKCAiHJtcScbmkwIXxVZA5abyenjDOByq9GbZCsruZCs4D1wOi1xxZCFGEpYPCAkB9m72BPILvLR7OkzTOusbkCcZAgAV9bTylEW4ZBYEXv76ZCfOautvHMd09mMKPyUPGDtuu7ERnBEzJmKHhN2FRdITVqSGLfgXk7QZDZD,VERIFY_TOKEN=rotaciclo2025,PHONE_NUMBER_ID=773919932476019\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.12.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "firebase-admin": "^12.1.1",
+    "firebase-functions": "^5.0.1"
+  }
+}
