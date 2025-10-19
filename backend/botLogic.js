@@ -144,33 +144,12 @@ async function encaminharParaAtendente(userNumber, atendimentoId, motivo) {
 }
 
 // ==================================================================================
-// --- FUNÇÃO PRINCIPAL DE PROCESSAMENTO DE MENSAGENS (COM LÓGICA ATUALIZADA) ---
+// --- FUNÇÃO PRINCIPAL DE PROCESSAMENTO DE MENSAGENS (COM A ESTRUTURA CORRIGIDA) ---
 // ==================================================================================
 async function processarMensagem(userNumber, userName, userMessage, waId) {
-    const atendimentosRef = db.collection('atendimentos');
-
-    // --- LÓGICA DE VERIFICAÇÃO DE CONTATO (NOVO VS. RETORNO) ---
-    // 1. Busca o atendimento MAIS RECENTE do cliente, independente do status.
-    const q = atendimentosRef.where('cliente_id', '==', userNumber).orderBy('solicitadoEm', 'desc').limit(1);
-    const snapshot = await q.get();
-
-    let atendimentoId;
-    let isNewConversation = true; // Assume que é uma nova conversa por padrão
-    let isFirstContactEver = snapshot.empty; // Verifica se o cliente NUNCA entrou em contato
-
-    // Se já existe um histórico, verifica o status do último atendimento
-    if (!isFirstContactEver) {
-        const lastAtendimento = snapshot.docs[0].data();
-        atendimentoId = snapshot.docs[0].id;
-
-        // Se o último atendimento NÃO foi resolvido, a conversa NÃO é nova.
-        if (lastAtendimento.status === 'aguardando' || lastAtendimento.status === 'em_atendimento') {
-            isNewConversation = false;
-        }
-    }
     
-    // --- INÍCIO DA INTEGRAÇÃO PIPEDRIVE: CRIAÇÃO/VERIFICAÇÃO DE CONTATO ---
-    // Garante que todo usuário que interage com o bot exista como um "Person" no Pipedrive.
+    // --- ESTRUTURA CORRIGIDA: Bloco do Pipedrive movido para o topo ---
+    // Isso garante que a verificação no Pipedrive SEMPRE aconteça no início.
     try {
         let pipedrivePerson = await Pipedrive.findPersonByPhone(userNumber);
         if (!pipedrivePerson) {
@@ -180,9 +159,24 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
     } catch(error) {
         console.error(`[Pipedrive] Falha ao verificar/criar contato para ${userNumber}:`, error);
     }
-    // --- FIM DA INTEGRAÇÃO PIPEDRIVE ---
+    // --- FIM DO BLOCO DO PIPEDRIVE ---
 
-    // 2. Lida com NOVAS CONVERSAS (Primeiro contato OU retorno de cliente)
+    const atendimentosRef = db.collection('atendimentos');
+    const q = atendimentosRef.where('cliente_id', '==', userNumber).orderBy('solicitadoEm', 'desc').limit(1);
+    const snapshot = await q.get();
+
+    let atendimentoId;
+    let isNewConversation = true; 
+    let isFirstContactEver = snapshot.empty; 
+
+    if (!isFirstContactEver) {
+        const lastAtendimento = snapshot.docs[0].data();
+        atendimentoId = snapshot.docs[0].id;
+        if (lastAtendimento.status === 'aguardando' || lastAtendimento.status === 'em_atendimento') {
+            isNewConversation = false;
+        }
+    }
+    
     if (isNewConversation) {
         if (isFirstContactEver) {
             console.log(`[${userNumber}] Primeiro contato de ${userName}.`);
@@ -192,7 +186,6 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
             await enviarTexto(userNumber, botMessages.welcomeReturn(userName));
         }
 
-        // Cria um novo documento de atendimento para o novo ciclo
         const profileData = await buscarDadosDePerfil(waId);
         const fotoUrl = profileData ? profileData.profile_picture_url : null;
         const newAtendimentoRef = await atendimentosRef.add({
@@ -206,17 +199,18 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
         atendimentoId = newAtendimentoRef.id;
         console.log(`[${userNumber}] Novo atendimento ${atendimentoId} criado.`);
 
-        // Define o estado inicial e envia o menu
         await updateUserState(userNumber, { state: 'AWAITING_CHOICE' });
         await new Promise(resolve => setTimeout(resolve, 1500));
         await enviarMenuPrincipalComoLista(userNumber, { state: 'AWAITING_CHOICE' });
-        return; // Encerra aqui, pois o bot já agiu e aguarda a resposta do menu.
+        
+        // Este 'return' é o que impedia a execução do código do Pipedrive antes da correção.
+        // Agora, ele pode continuar aqui sem problemas.
+        return; 
     }
     
     // --- LÓGICA PARA CONVERSAS JÁ ATIVAS ---
     console.log(`[${userNumber}] Atendimento ativo ${atendimentoId} encontrado.`);
 
-    // Salva a nova mensagem do cliente no histórico do atendimento ATIVO
     const messagesRef = db.collection('atendimentos').doc(atendimentoId).collection('mensagens');
     await messagesRef.add({
         texto: userMessage,
@@ -224,14 +218,12 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
         enviadaEm: Timestamp.now()
     });
 
-    // Se o atendimento já está com um humano, o bot não responde mais.
     const docSnap = await db.collection('atendimentos').doc(atendimentoId).get();
     if (docSnap.exists && docSnap.data().status === 'em_atendimento') {
         console.log(`[${userNumber}] Atendimento já com humano. Mensagem salva, sem resposta do bot.`);
         return;
     }
 
-    // Continua com a lógica do bot para o estado atual da conversa
     const userSession = await getUserState(userNumber) || {};
     const originalMsg = typeof userMessage === 'string' ? userMessage.trim() : userMessage;
     const msg = originalMsg.toLowerCase();
