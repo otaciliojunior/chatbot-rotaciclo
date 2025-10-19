@@ -1,7 +1,6 @@
-# Dependências
-node_modules
+# Arquivos de ambiente e chaves secretas do backend
+/backend/.env
+/backend/serviceAccountKey.json
 
-# Arquivos de ambiente
-.env
-
-frontend/
+# Dependências do backend
+/backend/node_modules
