@@ -8,6 +8,7 @@ const { iniciarOuvinteDeAtendimentos } = require('./firestoreService');
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // <-- ADIÇÃO SUGERIDA
 app.use(cors());
 
 // --- ROTAS DO SERVIDOR ---
