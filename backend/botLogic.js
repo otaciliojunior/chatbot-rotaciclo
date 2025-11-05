@@ -192,7 +192,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
             cliente_id: userNumber,
             cliente_nome: userName,
             cliente_foto_url: fotoUrl,
-            status: 'aguardando',
+            status: 'navegando',
             solicitadoEm: Timestamp.now(),
             motivo: userMessage
         });
@@ -512,9 +512,15 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
             break;
         // --- FIM FLUXO DE AGENDAMENTO ---
 
+        // /backend/botLogic.js
+
         case 'AWAITING_HUMAN_REQUEST_REASON':
             const motivo = userMessage;
-            await db.collection('atendimentos').doc(atendimentoId).update({ motivo: motivo });
+            // Adicionamos o 'status: aguardando' aqui
+            await db.collection('atendimentos').doc(atendimentoId).update({ 
+                motivo: motivo, 
+                status: 'aguardando'
+            });
             await enviarTexto(userNumber, botMessages.humanRequestSuccess);
             console.log(`[${userNumber}] Motivo do atendimento ${atendimentoId} atualizado para: "${motivo}"`);
             

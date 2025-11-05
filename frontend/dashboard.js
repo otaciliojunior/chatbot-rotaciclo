@@ -4,11 +4,14 @@ import * as UI from './ui.js';
 import * as Listeners from './listeners.js';
 import * as Utils from './utils.js';
 
+// --- (NOVO) IMPORTAÇÕES DE AUTENTICAÇÃO ---
+import { auth, onAuthStateChanged, signOut } from './firebase.js';
+
 // --- ESTADO DA APLICAÇÃO ---
 let unsubscribeMessages = null;
 let adminName = '';
 
-// --- LÓGICA DE NEGÓCIO PRINCIPAL ---
+// --- LÓGICA de NEGÓCIO PRINCIPAL ---
 
 function setupAdminProfile() {
     adminName = localStorage.getItem('adminName') || prompt("Por favor, digite o seu nome de atendente:") || 'Atendente';
@@ -269,6 +272,17 @@ function initializeApp() {
                 UI.openProductModal({ id: productSnap.id, ...productSnap.data() });
             }
         }
+        
+        // ===== BLOCO ADICIONADO =====
+        if (action === 'edit-service') {
+            // Lógica para carregar dados do serviço no modal
+            alert(`Abrir modal para EDITAR o serviço: ${id}`);
+            // Exemplo:
+            // const serviceData = await loadServiceData(id); // (função a ser criada)
+            // openServiceModal(serviceData); // (função a ser criada)
+        }
+        // ===== FIM DO BLOCO =====
+        
         if (action === 'mark-paid') {
             const item = btn.closest('.parcela-item');
             const { vendaId, parcelaNumero } = item.dataset;
@@ -304,7 +318,7 @@ function initializeApp() {
 
                     // Chama a nova função da API para enviar imagem com legenda
                     await API.enviarImagemComLegendaViaAPI(clienteId, product.imagemUrl, legenda);
-                    
+
                     // **CORREÇÃO APLICADA AQUI**
                     // Adiciona uma mensagem no chat local para o atendente ver o que foi enviado
                     const textoConfirmacao = `[PRODUTO ENVIADO]: ${product.nome}`;
@@ -340,6 +354,16 @@ function initializeApp() {
     });
     UI.closeProductSenderBtn.addEventListener('click', () => UI.toggleProductSender(false));
     UI.productSearchInput.addEventListener('keyup', () => UI.renderProductSearchResults(Listeners.allProducts, UI.productSearchInput.value));
+
+    // --- Listeners da View de Serviços (NOVO) ---
+    const addServiceBtn = document.getElementById('add-service-btn');
+    if(addServiceBtn) {
+        addServiceBtn.addEventListener('click', () => {
+            // Aqui você chamaria a lógica para abrir um modal de serviço
+            alert('Abrir modal para ADICIONAR novo serviço.');
+            // Ex: openServiceModal(); 
+        });
+    }
 
     // Listeners do Modal de Produto
     UI.addProductBtn.addEventListener('click', () => UI.openProductModal());
@@ -415,7 +439,36 @@ function initializeApp() {
             saveNotesBtn.disabled = false;
         }
     });
+
+    // --- (NOVO) LISTENER DO BOTÃO SAIR ---
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+            if (confirm('Tem certeza que deseja sair?')) {
+                try {
+                    await signOut(auth);
+                    // O "porteiro" (onAuthStateChanged) abaixo cuidará do redirecionamento
+                } catch (error) {
+                    console.error('Erro ao sair:', error);
+                }
+            }
+        });
+    }
 }
 
-// Inicia a aplicação quando o DOM estiver pronto
-document.addEventListener('DOMContentLoaded', initializeApp);
+// --- (SUBSTITUÍDO) Bloco de Autenticação "Porteiro" ---
+// Isso substitui o 'document.addEventListener('DOMContentLoaded', initializeApp);'
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        // Usuário está logado.
+        // Garante que o DOM esteja pronto antes de inicializar o app
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeApp);
+        } else {
+            initializeApp();
+        }
+    } else {
+        // Usuário não está logado, redireciona para a página de login
+        window.location.href = 'index.html';
+    }
+});

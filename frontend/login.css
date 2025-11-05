@@ -1,0 +1,54 @@
+/* --- Estilos da Página de Login --- */
+
+.login-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Usando variáveis do style.css */
+    background-color: var(--cor-fundo-app);
+    height: 100vh;
+}
+
+.login-container {
+    background-color: var(--cor-surface);
+    padding: 40px 32px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    width: 100%;
+    max-width: 400px;
+    border: 1px solid var(--cor-borda-suave);
+}
+
+.login-container .logo {
+    text-align: center;
+    margin-bottom: 8px;
+}
+
+.login-subtitle {
+    text-align: center;
+    font-size: 15px;
+    color: var(--cor-texto-secundario);
+    margin-bottom: 24px;
+}
+
+.login-error-message {
+    color: #e63946;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    min-height: 1.2em; /* Evita que o layout "pule" */
+    text-align: center;
+}
+
+/* Ajustes no .save-btn (do style.css) para a tela de login */
+.login-page .save-btn.full-width {
+    width: 100%;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    font-size: 15px;
+}
+
+.login-page .save-btn:disabled {
+    background-color: #ADB5BD;
+    cursor: not-allowed;
+}

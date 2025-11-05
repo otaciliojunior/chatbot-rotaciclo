@@ -354,3 +354,151 @@ a { text-decoration: none; color: inherit; }
     resize: vertical;
 }
 .save-btn.full-width { width: 100%; }
+
+/* --- 8. ESTILOS DA VIEW DE SERVIÇOS E HORÁRIOS --- */
+
+#servicos-container {
+    /* O painel já tem padding, mas mudamos o fundo para destacar os cards */
+    background-color: var(--cor-fundo-app);
+}
+
+.servicos-grid {
+    display: grid;
+    /* Cria colunas responsivas que tentam ter 320px, mas se ajustam */
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 24px;
+}
+
+.servico-card {
+    background-color: var(--cor-surface);
+    border: 1px solid var(--cor-borda-suave);
+    border-radius: 12px;
+    box-shadow: var(--sombra-padrao);
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow 0.2s ease;
+}
+
+.servico-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.servico-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--cor-borda-suave);
+}
+
+.servico-card-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--cor-texto-primario);
+    /* Deixa o nome do serviço com a primeira letra maiúscula */
+    text-transform: capitalize;
+}
+
+/* Ajusta o botão de ação dentro do card */
+.servico-card-header .action-btn {
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: var(--cor-texto-secundario);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.servico-card-header .action-btn:hover {
+    background-color: var(--cor-fundo-app); /* cor-fundo-app ou #F1F3F5 */
+    color: var(--cor-primaria);
+}
+
+.servico-card-body {
+    padding: 12px 20px 20px 20px;
+    flex-grow: 1;
+}
+
+.horarios-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.horarios-list li {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid #F1F3F5; /* Cor suave do chat-list */
+}
+
+.horarios-list li:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.horarios-list li:first-child {
+    padding-top: 4px;
+}
+
+.horarios-list .dia {
+    font-weight: 500;
+    color: var(--cor-texto-primario);
+    font-size: 15px;
+    padding-top: 6px; /* Alinha o texto do dia com o centro da tag */
+    flex-shrink: 0;
+    margin-right: 16px;
+}
+
+.horarios-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+    max-width: 70%; /* Evita que as tags quebrem de forma estranha */
+}
+
+.time-tag {
+    background-color: #E9ECEF; /* Cor do nav-item (hover) */
+    color: #495057; /* Cor do nav-item */
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 16px;
+    white-space: nowrap;
+}
+
+/* Estilo para dias sem horários (ex: "Fechado") */
+.horarios-list .no-times {
+    font-size: 14px;
+    color: var(--cor-texto-secundario);
+    font-style: italic;
+    padding-top: 6px;
+    text-align: right;
+    width: 100%;
+}
+
+/* --- 9. Componentes da Sidebar (Ex: Logout) --- */
+.logout-btn {
+    background: none;
+    border: none;
+    color: var(--cor-texto-secundario);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 8px;
+    width: 100%;
+    text-align: left;
+    margin-top: 8px;
+}
+.logout-btn:hover {
+    background-color: #F1F3F5;
+    color: var(--cor-texto-primario);
+}
