@@ -27,7 +27,7 @@ if (process.env.FUNCTIONS_EMULATOR || Object.keys(functions.config()).length) {
   };
 
 } else {
-  // --- AMBIENTE LOCAL (SUA MÁQUINA) ---
+  // --- AMBIENTE LOCAL (SUA MÁQUINA)
   require('dotenv').config();
 
   // Carrega as credenciais do Firebase a partir do arquivo .env local
