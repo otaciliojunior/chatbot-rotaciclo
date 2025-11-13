@@ -1,0 +1,289 @@
+:root {
+    --cor-primaria: #007bff;
+    --cor-primaria-hover: #0069d9;
+    --cor-fundo: #f8f9fa;
+    --cor-texto: #333;
+    --cor-texto-secundario: #54656f;
+    --cor-gradiente-inicio: #052c65;
+    --cor-gradiente-fim: #0d6efd;
+    --cor-branco: #ffffff;
+    --cor-erro: #d9534f;
+    --sombra: 0 10px 30px rgba(0, 0, 0, 0.07);
+}
+
+/* Cores em RGB para uso no overlay */
+body {
+    --cor-gradiente-inicio-rgb: 5, 44, 101;
+    --cor-gradiente-fim-rgb: 13, 110, 253;
+}
+
+/* --- Layout Base com Fundo de Imagem --- */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--cor-fundo);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    overflow: hidden;
+
+    /* Imagem de fundo */
+    background: url('img/foto-login.jpg') no-repeat center center / cover;
+    position: relative;
+}
+
+/* Overlay para escurecer a imagem e aplicar a cor da marca */
+body::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(var(--cor-gradiente-fim-rgb), 0.85), rgba(var(--cor-gradiente-inicio-rgb), 0.9));
+    z-index: 1;
+}
+
+/* --- Container Principal (Centralizado) --- */
+.login-container {
+    position: relative;
+    z-index: 2; /* Acima do overlay */
+    padding: 2rem;
+}
+
+.login-card {
+    background-color: var(--cor-branco);
+    padding: 2.5rem;
+    border-radius: 12px;
+    box-shadow: var(--sombra);
+    width: 100%;
+    max-width: 420px;
+    text-align: center;
+    animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Nova Logo --- */
+.login-logo {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--cor-texto);
+    margin-bottom: 0.5rem;
+}
+
+.login-logo .fa-bicycle {
+    font-size: 2rem;
+    color: var(--cor-primaria);
+}
+
+.login-logo h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+
+.login-card h2 {
+    color: var(--cor-texto);
+    margin-bottom: 0.5rem;
+    font-size: 1.5rem; /* Ajustado */
+}
+
+.login-card .subtitle {
+    color: var(--cor-texto-secundario);
+    margin-bottom: 2rem;
+}
+
+.input-group {
+    margin-bottom: 1.25rem;
+    text-align: left;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--cor-texto);
+}
+
+.input-group input {
+    width: 100%;
+    padding: 0.85rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 1rem;
+    box-sizing: border-box; 
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: var(--cor-primaria);
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+}
+
+#login-button {
+    width: 100%;
+    padding: 0.85rem;
+    border: none;
+    border-radius: 6px;
+    background-color: var(--cor-primaria);
+    color: var(--cor-branco);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease-out;
+}
+
+#login-button:hover {
+    background-color: var(--cor-primaria-hover);
+}
+
+#login-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.error-message {
+    color: var(--cor-erro);
+    margin-top: 1rem;
+    font-size: 0.875rem;
+    height: 1.2em; 
+}
+
+/* --- Botão e Modal FAQ --- */
+.faq-button {
+    position: absolute;
+    top: 2rem;
+    right: 2rem;
+    background-color: transparent;
+    color: rgba(255, 255, 255, 0.8); /* Branco com transparência */
+    border: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 6px;
+    transition: color 0.2s, background-color 0.2s;
+    z-index: 3; /* Acima do overlay */
+}
+
+.faq-button .material-symbols-outlined {
+    font-size: 1.2rem;
+}
+
+.faq-button:hover {
+    color: var(--cor-branco);
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-out, visibility 0.3s ease-out;
+    z-index: 100;
+}
+
+.modal-overlay.open {
+    opacity: 1;
+    visibility: visible;
+}
+
+.faq-modal {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 100%;
+    max-width: 450px; 
+    background-color: var(--cor-branco);
+    box-shadow: -4px 0 15px rgba(0, 0, 0, 0.1);
+    transform: translateX(100%); 
+    transition: transform 0.3s ease-out;
+    z-index: 101;
+    display: flex;
+    flex-direction: column;
+}
+
+.faq-modal.open {
+    transform: translateX(0); 
+}
+
+.faq-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #e0e0e0;
+    flex-shrink: 0;
+}
+
+.faq-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: var(--cor-texto);
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    color: #888;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+}
+
+.close-button:hover {
+    color: var(--cor-texto);
+}
+
+.faq-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+.faq-content h4 {
+    font-size: 1rem;
+    color: var(--cor-texto);
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.faq-content h4:first-child {
+    margin-top: 0;
+}
+
+.faq-content p {
+    font-size: 0.9rem;
+    color: var(--cor-texto-secundario);
+    line-height: 1.6;
+}
+
+/* --- Layout Responsivo (Mobile) --- */
+@media (max-width: 800px) {
+    .login-container {
+        padding: 1rem;
+    }
+
+    .login-card {
+        padding: 2rem 1.5rem;
+    }
+
+    .faq-button {
+        top: 1rem;
+        right: 1rem;
+    }
+}

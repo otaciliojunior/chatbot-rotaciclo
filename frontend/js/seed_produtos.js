@@ -3,7 +3,7 @@ const admin = require('firebase-admin');
 
 // ATENÇÃO: Verifique se este caminho para sua chave de serviço está correto!
 // Pode ser './serviceAccountKey.json' ou '../backend/serviceAccountKey.json', etc.
-const serviceAccount = require('../backend/serviceAccountKey.json');
+const serviceAccount = require('../../backend/serviceAccountKey.json');
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)

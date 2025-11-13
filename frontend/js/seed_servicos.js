@@ -3,7 +3,7 @@ const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 
 // Aponta para a chave de serviço na pasta do backend
-const serviceAccount = require('../backend/serviceAccountKey.json');
+const serviceAccount = require('../../backend/serviceAccountKey.json');
 
 // Inicializa uma instância separada do app para evitar conflitos
 // com o servidor principal ou outros scripts.

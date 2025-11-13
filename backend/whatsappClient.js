@@ -1,5 +1,6 @@
 // /backend/whatsappClient.js
 const axios = require('axios');
+// REMOVIDO: 'VERIFY_TOKEN' e 'processarMensagem'
 const { PHONE_NUMBER_ID, META_ACCESS_TOKEN } = require('./config');
 
 async function enviarPayloadGenerico(payload) {
@@ -33,7 +34,7 @@ async function enviarTexto(recipientId, text) {
     await enviarPayloadGenerico(payload);
 }
 
-async function enviarImagem(recipientId, imageUrl, caption) {
+async function enviarImagemComLegenda(recipientId, imageUrl, caption) {
     const payload = {
         messaging_product: "whatsapp",
         to: recipientId,
@@ -101,7 +102,6 @@ async function enviarBotoes(recipientId, bodyText, buttons) {
     await enviarPayloadGenerico(payload);
 }
 
-// ALTERAÇÃO 1: Adicionada a nova função para buscar dados do perfil
 async function buscarDadosDePerfil(waId) {
     const url = `https://graph.facebook.com/v19.0/${waId}?fields=name,profile_picture_url`;
     const headers = {
@@ -112,7 +112,7 @@ async function buscarDadosDePerfil(waId) {
         console.log(`--- BUSCANDO DADOS DE PERFIL PARA ${waId} ---`);
         const response = await axios.get(url, { headers: headers });
         console.log(`--- DADOS DE PERFIL OBTIDOS COM SUCESSO ---`);
-        return response.data; // Retorna um objeto como { name: "José", profile_picture_url: "http..." }
+        return response.data;
     } catch (error) {
         console.error('--- ERRO AO BUSCAR DADOS DO PERFIL ---');
         console.error(error.response ? JSON.stringify(error.response.data, null, 2) : error.message);
@@ -120,11 +120,15 @@ async function buscarDadosDePerfil(waId) {
     }
 }
 
+// --- FUNÇÕES DE WEBHOOK REMOVIDAS DAQUI ---
+// (Elas foram movidas para o index.js)
+
+// --- EXPORTS ATUALIZADOS ---
 module.exports = { 
     enviarTexto, 
     enviarLista, 
     enviarBotoes,
-    enviarImagem,
-    // ALTERAÇÃO 2: Exportamos a nova função
-    buscarDadosDePerfil 
+    enviarImagemComLegenda,
+    buscarDadosDePerfil
+    // 'verificarTokenWebhook' e 'processarMensagemWebhook' foram removidos
 };

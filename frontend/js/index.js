@@ -1,6 +1,28 @@
-// Importa as funções de autenticação do seu arquivo firebase.js
-import { auth, signInWithEmailAndPassword } from './firebase.js';
+// --- 1. IMPORTAÇÕES DO FIREBASE ---
+// (Importa SÓ o necessário para o login)
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+import { 
+    getAuth, 
+    signInWithEmailAndPassword 
+} from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 
+// --- 2. CONFIGURAÇÃO DO FIREBASE ---
+const firebaseConfig = {
+    apiKey: "AIzaSyC1rzlA51ICexuzyMjHkbk6HnRb2lLwk9Y",
+    authDomain: "rotaciclo.firebaseapp.com",
+    projectId: "rotaciclo",
+    storageBucket: "rotaciclo.firebasestorage.app",
+    messagingSenderId: "490741633811",
+    appId: "1:90741633811:web:7b1115381d58bb23e3c0e6",
+    measurementId: "G-G2R6G1S8DK"
+};
+
+// --- 3. INICIALIZAÇÃO DOS SERVIÇOS ---
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+console.log("Firebase (Login) conectado!");
+
+// --- 4. LÓGICA DA PÁGINA DE LOGIN ---
 document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('login-form');
     const emailInput = document.getElementById('login-email');
@@ -14,7 +36,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const email = emailInput.value;
         const password = passwordInput.value;
 
-        // Limpa erros antigos e desabilita o botão
         errorElement.textContent = '';
         loginButton.disabled = true;
         loginButton.textContent = 'Aguarde...';
@@ -31,7 +52,6 @@ document.addEventListener('DOMContentLoaded', () => {
             loginButton.disabled = false;
             loginButton.textContent = 'Entrar';
 
-            // Mostra uma mensagem de erro amigável
             if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
                 errorElement.textContent = 'E-mail ou senha inválidos.';
             } else {

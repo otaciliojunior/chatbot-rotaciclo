@@ -1,54 +1,29 @@
-// /backend/botLogic.js
+// js/botLogic.js (CORRIGIDO)
+
 const { Timestamp, FieldValue } = require('firebase-admin/firestore');
 const { db, getUserState, updateUserState, deleteUserState } = require('./firestoreService');
-const { enviarTexto, enviarLista, enviarBotoes, enviarImagem, buscarDadosDePerfil } = require('./whatsappClient');
-const Pipedrive = require('./pipedriveService'); // <-- ADIÇÃO: Importa o serviço do Pipedrive
+// CORRIGIDO: 'enviarImagem' -> 'enviarImagemComLegenda'
+const { enviarTexto, enviarLista, enviarBotoes, enviarImagemComLegenda, buscarDadosDePerfil } = require('./whatsappClient');
 
-// AGENDA FIXA: Configure aqui os serviços e horários disponíveis
-const agendaFixa = {
-    "preventiva": {
-        nomeFormatado: "Revisão Preventiva",
-        subServicos: {
-            "basica": { nomeFormatado: "Preventiva Básica", preco: null },
-            "completa": { nomeFormatado: "Preventiva Completa", preco: 70.00 }
-        },
-        dias: ["terca", "quarta", "quinta", "sexta"],
-        horarios: ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"]
-    },
-    "corretiva": {
-        nomeFormatado: "Revisão Corretiva",
-        dias: ["terca", "quarta", "quinta"],
-        horarios: ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"]
-    }
-};
-
+// ... (todo o resto do arquivo, botMessages, diasFormatados, getIntention, etc. permanece igual) ...
 const botMessages = {
-    // --- GERAL ---
-    // Mensagens de boas-vindas diferenciadas
     welcomeFirstTime: (userName) => `Fala, ${userName}! Bem-vindo(a) à *Rota Ciclo*! Esse é nosso novo canal de atendimento automático, feito para deixar sua experiência mais prática e aproximar você ainda mais da nossa loja. Bora pedalar junto nessa nova rota? 🚴🏼`,
     welcomeReturn: (userName) => `Fala, ${userName}! Bem-vindo(a) de volta à *Rota Ciclo*!`,
     invalidOption: "Ops, não entendi essa opção 🤔. Tenta clicar em uma das opções do menu, beleza?",
     thankYou: "Beleza! Se precisar de mais alguma coisa, é só chamar.",
-
-    // --- MENU PRINCIPAL ---
-    mainMenuHeader: "*Escolha a opção* que mais combina com o que você precisa e eu te ajudo rapidinho! 😉", 
-    
-    // --- PRODUTOS E PEÇAS ---
+    mainMenuHeader: "*Escolha a opção* que mais combina com o que você precisa e eu te ajudo rapidinho! Se quiser voltar pro menu depois, é só digitar *Menu*. 😉",
     askBikeType: "Boa escolha! 🚴 Temos bikes pra todo tipo de rolê. Qual categoria você procura?",
-    askPartsCategory: "Certo! Sobre qual categoria de peças e acessórios você gostaria de saber?", // MENSAGEM ATUALIZADA
-    // NOVAS MENSAGENS PARA O FLUXO DE PEÇAS
+    askPartsCategory: "Certo! Sobre qual categoria de peças e acessórios você gostaria de saber?", 
     askIluminacaoHandoff: "Você deseja falar com um atendente para finalizar a compra ou saber mais informações do produto?",
     camarasPriceTable: "Legal! Nossas câmaras de ar têm um excelente custo-benefício. Confira os valores:\n\n*TABELA DE PREÇOS - CÂMARAS DE AR*\n\n*KENDA*\n• Aro 29 (Bico Fino/Grosso): *R$ 35,00*\n• Aro 26 (Bico Grosso): *R$ 25,00*\n• Aro 24 (Bico Grosso): *R$ 25,00*\n• Aro 20 (Bico Grosso): *R$ 25,00*\n\n*PIRELLI*\n• Aro 29 (Bico Fino): *R$ 40,00*",
     askCamarasHandoff: "Deseja continuar a compra e finalizar?",
     askPneuSize: "Entendido. Qual o tamanho do pneu que você procura?",
     pneuSizeConfirmation: (aro) => `Você escolheu pneu *aro ${aro}*. Vou transferir para um atendente para entender melhor sua necessidade e finalizar a compra.`,
     partsGoodbye: "Tudo bem! Se precisar de algo mais, é só chamar.",
-    productCaption: (bike) => `*${bike.nome}*\n\n${bike.descricao || 'Descrição não informada.'}\n\n*Preço:* ${bike.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n*Estoque:* ${bike.estoque || 'Consultar'} unidades`,
+    productCaption: (bike) => `*${bike.nome}*\n\n${bike.descricao || 'Descrição não informada.'}\n\n*Preço:* ${bike.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n*Estoque:* ${bike.estoque || 'Consultar'} unidade(s)`,
     noBikesFound: (bikeType) => `Poxa, no momento estamos sem bikes na categoria *${bikeType}*. 😕\n\nDigite 'menu' para ver outras opções.`,
     productOutOfStock: (productName) => `Poxa, o item *${productName}* acabou de esgotar em nosso estoque! 😕\n\nVamos voltar ao menu para você escolher outro modelo, combinado?`,
-    
-    // --- MENSAGENS DO CARRINHO ---
-    addToCartPrompt: "Qual destes modelos você gostaria de adicionar ao carrinho?",
+    addToCartPrompt: "Qual destes models você gostaria de adicionar ao carrinho?",
     itemAddedToCart: (productName) => `✅ *${productName}* foi adicionado ao seu carrinho!`,
     afterAddToCartOptions: "Legal! O que você gostaria de fazer agora?",
     cartHeader: "🛒 *Seu Carrinho de Compras*",
@@ -57,36 +32,26 @@ const botMessages = {
     cartEmpty: "Seu carrinho está vazio no momento. Que tal dar uma olhada nos nossos produtos?",
     cartCleared: "✅ Seu carrinho foi esvaziado com sucesso!",
     cartActionsPrompt: "O que deseja fazer?",
-
-    // --- MENSAGENS DO CHECKOUT ---
     askForName: "Para finalizar, qual é o seu nome completo?",
     askForAddress: (name) => `Obrigado, ${name}! Agora, por favor, digite o seu endereço completo para a entrega (Rua, Número, Bairro, Cidade).`,
     askForPayment: "Perfeito. E como prefere pagar?",
     orderSuccess: (orderId) => `✅ Pedido recebido com sucesso!\n\nO número do seu pedido é *#${orderId}*.\n\nEntraremos em contato em breve para confirmar os detalhes do pagamento e da entrega. Obrigado por comprar na Rota Ciclo!`,
     orderError: "Ocorreu um erro ao processar o seu pedido. Por favor, tente novamente ou fale com um atendente.",
     orderStockError: (productName) => `Ops! 😟 Parece que o item *${productName}* esgotou enquanto você finalizava a compra. Por favor, remova-o do carrinho ou digite 'menu' para recomeçar.`,
-
-
-    // --- FINANCEIRO ---
     financeHeader: "Beleza, consultando seus dados financeiros... 🔎",
     financeInstallmentInfo: (venda) => `📄 Ref: *${venda.produto_nome}*\n🔢 Parcela: *${venda.proxima_parcela.numero}*\n💰 Valor: *R$ ${venda.proxima_parcela.valor.toFixed(2).replace('.', ',')}*\n🗓️ Vencimento: *${venda.proxima_parcela.data_vencimento.toDate().toLocaleDateString('pt-BR')}*`,
     financeNoPending: "Boas notícias! 🎉 Você não tem nenhuma parcela pendente com a gente no momento.",
     financeNotFound: "Não encontrei nenhuma compra parcelada registrada para o seu número. Se você acredita que isso é um erro, por favor, fale com um atendente.",
     financeError: "Ops, não consegui consultar seus dados agora. Tente novamente mais tarde, por favor.",
-
-    // --- AGENDAMENTO ---
-    askServiceType: "Claro! Qual tipo de revisão você procura?",
-    askPreventivaSubType: "Certo! E qual tipo de Revisão Preventiva você deseja?",
-    askCorretivaDescription: "Entendi. Pode me contar um pouco mais sobre o problema? Assim o técnico já fica ciente antes de verificar a sua bicicleta.",
-    askPreventivaConfirmation: (preco) => `A Revisão Completa tem o valor de *${preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}*. Deseja continuar com o agendamento?`,
+    askServiceType: "Claro! Qual dos nossos serviços de oficina você procura?",
     listAvailableDays: (serviceType) => `Show! Para *${serviceType}*, temos horários nos seguintes dias. Qual dia você prefere?`,
     noSchedulesFound: "Poxa, parece que não temos horários disponíveis para este serviço no momento. Tente novamente mais tarde.",
+    noSchedulesFoundForService: (serviceName) => `Ops! Parece que o serviço *${serviceName}* não está com dias configurados no nosso painel. Já avisei um atendente.`,
     invalidDay: "Esse dia não tá disponível ou foi digitado errado 🤷. Escolhe um dos que te passei, beleza?",
     listAvailableTimes: (day, service) => `Fechado! Para *${service}* na *${day}*, temos esses horários disponíveis. Qual te serve melhor?`,
     invalidTime: "Esse horário não rola 😬. Escolhe um dos que eu te mostrei.",
     bookingSuccess: (service, day, time) => `✅ Agendamento confirmado!\n\nSeu serviço de *${service}* foi marcado para *${day}* às *${time}*.\n\nObrigado por escolher a Rota Ciclo! 🚴‍♂️`,
-
-    // --- ATENDIMENTO HUMANO ---
+    adHandoff: (userName) => `Olá, ${userName}! Vi que você se interessou pelo nosso anúncio. Excelente escolha! 🤩\n\nJá estou passando sua solicitação para um especialista que vai te dar todos os detalhes. Só aguarda um pouquinho!`,
     requestHumanHandoffReason: "Beleza! Pra agilizar, me conta em uma mensagem só qual é a sua dúvida principal.\n\n_(Obs: não consigo entender áudios, só texto 🫱🏽‍🫲🏽)_",
     humanRequestSuccess: "Pronto! Sua solicitação já tá na fila. Um dos nossos vai falar contigo aqui mesmo, só aguarda um pouquinho 😉.",
     humanHandoff: "Entendi. Para te ajudar melhor com isso, estou te transferindo para um de nossos especialistas. Em instantes, alguém falará com você aqui mesmo. 👍",
@@ -94,85 +59,93 @@ const botMessages = {
 };
 
 const diasFormatados = {
+    "segunda": "Segunda-feira",
     "terca": "Terça-feira",
     "quarta": "Quarta-feira",
     "quinta": "Quinta-feira",
-    "sexta": "Sexta-feira"
+    "sexta": "Sexta-feira",
+    "sabado": "Sábado",
+    "domingo": "Domingo"
 };
 
 function getIntention(message) {
     const lowerCaseMessage = message.toLowerCase();
-    const productKeywords = ['bike', 'bicicleta', 'produto', 'comprar', 'ver', 'modelo', 'preço', 'catalogo'];
-    if (productKeywords.some(keyword => lowerCaseMessage.includes(keyword))) return "bicicletas (produtos)";
-    const financeKeywords = ['parcela', 'pagamento', 'boleto', 'dívida', 'financeiro', 'valor', 'conta'];
-    if (financeKeywords.some(keyword => lowerCaseMessage.includes(keyword))) return "consultar parcelas";
-    const scheduleKeywords = ['agendar', 'agendamento', 'revisão', 'consertar', 'manutenção', 'arrumar', 'oficina'];
-    if (scheduleKeywords.some(keyword => lowerCaseMessage.includes(keyword))) return "revisão / agendamento";
+
     const humanKeywords = ['falar', 'atendente', 'humano', 'ajuda', 'pessoa', 'problema', 'alguem'];
     if (humanKeywords.some(keyword => lowerCaseMessage.includes(keyword))) return "falar com atendente";
+    
+    const productKeywords = ['bike', 'bicicleta', 'produto', 'comprar', 'ver', 'modelo', 'preço', 'catalogo'];
+    if (productKeywords.some(keyword => lowerCaseMessage.includes(keyword))) return "bicicletas (produtos)";
+    
+    const financeKeywords = ['parcela', 'pagamento', 'boleto', 'dívida', 'financeiro', 'valor', 'conta'];
+    if (financeKeywords.some(keyword => lowerCaseMessage.includes(keyword))) return "consultar parcelas";
+    
+    const scheduleKeywords = ['agendar', 'agendamento', 'revisão', 'consertar', 'manutenção', 'arrumar', 'oficina'];
+    if (scheduleKeywords.some(keyword => lowerCaseMessage.includes(keyword))) return "revisão / agendamento";
+    
     const cartKeywords = ['carrinho', 'ver carrinho', 'meu pedido', 'minhas compras'];
     if (cartKeywords.some(keyword => lowerCaseMessage.includes(keyword))) return "menu_ver_carrinho";
+    
     return message;
 }
 
 async function encaminharParaAtendente(userNumber, atendimentoId, motivo) {
     console.log(`[${userNumber}] Encaminhando para atendente. Motivo: ${motivo}`);
-    
     await db.collection('atendimentos').doc(atendimentoId).update({ 
         motivo: motivo,
-        status: 'aguardando'
+        status: 'aguardando',
+        atendimentoIniciadoEm: Timestamp.now()
     });
-
-    // --- INÍCIO DA INTEGRAÇÃO PIPEDRIVE ---
-    try {
-        const person = await Pipedrive.findPersonByPhone(userNumber);
-        if (person) {
-            const dealTitle = `Atendimento WhatsApp - ${person.name}`;
-            const deal = await Pipedrive.createDeal(dealTitle, person.id);
-            if (deal) {
-                const nota = `Motivo do contato: ${motivo}\n\nID do Atendimento no sistema interno: ${atendimentoId}`;
-                await Pipedrive.addNoteToDeal(nota, deal.id);
-            }
-        }
-    } catch(error) {
-        console.error(`[Pipedrive] Falha ao criar negócio para ${userNumber}:`, error);
-    }
-    // --- FIM DA INTEGRAÇÃO PIPEDRIVE ---
-
     await enviarTexto(userNumber, botMessages.humanHandoff);
     await deleteUserState(userNumber);
 }
 
-// ==================================================================================
-// --- FUNÇÃO PRINCIPAL DE PROCESSAMENTO DE MENSAGENS (COM A ESTRUTURA CORRIGIDA) ---
-// ==================================================================================
-async function processarMensagem(userNumber, userName, userMessage, waId) {
+async function processarMensagem(userNumber, userName, userMessage, waId, referralData = null) {
     
-    // --- ESTRUTURA CORRIGIDA: Bloco do Pipedrive movido para o topo ---
-    // Isso garante que a verificação no Pipedrive SEMPRE aconteça no início.
-    try {
-        let pipedrivePerson = await Pipedrive.findPersonByPhone(userNumber);
-        if (!pipedrivePerson) {
-            console.log(`[Pipedrive] Contato não encontrado para ${userNumber}. Criando...`);
-            pipedrivePerson = await Pipedrive.createPerson(userName, userNumber);
+    if (referralData) {
+        console.log(`[${userNumber}] Cliente chegou via Anúncio (CTW). Source ID: ${referralData.source_id || 'N/A'}`);
+        const atendimentosRef = db.collection('atendimentos');
+        const q = atendimentosRef.where('cliente_id', '==', userNumber).orderBy('solicitadoEm', 'desc').limit(1);
+        const snapshot = await q.get();
+        let atendimentoId;
+        if (snapshot.empty) {
+            const profileData = await buscarDadosDePerfil(waId);
+            const fotoUrl = profileData ? profileData.profile_picture_url : null;
+            const newAtendimentoRef = await atendimentosRef.add({
+                cliente_id: userNumber,
+                cliente_nome: userName,
+                cliente_foto_url: fotoUrl,
+                status: 'aguardando', 
+                solicitadoEm: Timestamp.now(),
+                motivo: "Vindo de Anúncio"
+            });
+            atendimentoId = newAtendimentoRef.id;
+        } else {
+            atendimentoId = snapshot.docs[0].id;
         }
-    } catch(error) {
-        console.error(`[Pipedrive] Falha ao verificar/criar contato para ${userNumber}:`, error);
+        const adHeadline = referralData.headline || "Produto do Anúncio";
+        const motivoHandoff = `Interesse via Anúncio: ${adHeadline}. (Mensagem: "${userMessage}")`;
+        await db.collection('atendimentos').doc(atendimentoId).update({ 
+            motivo: motivoHandoff,
+            status: 'aguardando',
+            atendimentoIniciadoEm: Timestamp.now()
+        });
+        await enviarTexto(userNumber, botMessages.adHandoff(userName));
+        await deleteUserState(userNumber); 
+        return; 
     }
-    // --- FIM DO BLOCO DO PIPEDRIVE ---
 
     const atendimentosRef = db.collection('atendimentos');
     const q = atendimentosRef.where('cliente_id', '==', userNumber).orderBy('solicitadoEm', 'desc').limit(1);
     const snapshot = await q.get();
-
     let atendimentoId;
     let isNewConversation = true; 
     let isFirstContactEver = snapshot.empty; 
-
+    
     if (!isFirstContactEver) {
         const lastAtendimento = snapshot.docs[0].data();
         atendimentoId = snapshot.docs[0].id;
-        if (lastAtendimento.status === 'aguardando' || lastAtendimento.status === 'em_atendimento') {
+        if (lastAtendimento.status === 'aguardando' || lastAtendimento.status === 'em_atendimento' || lastAtendimento.status === 'navegando' || lastAtendimento.status === 'navegando_avisado') {
             isNewConversation = false;
         }
     }
@@ -185,7 +158,6 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
             console.log(`[${userNumber}] Cliente ${userName} retornou após atendimento resolvido.`);
             await enviarTexto(userNumber, botMessages.welcomeReturn(userName));
         }
-
         const profileData = await buscarDadosDePerfil(waId);
         const fotoUrl = profileData ? profileData.profile_picture_url : null;
         const newAtendimentoRef = await atendimentosRef.add({
@@ -194,42 +166,49 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
             cliente_foto_url: fotoUrl,
             status: 'navegando',
             solicitadoEm: Timestamp.now(),
+            ultimaInteracao: Timestamp.now(),
             motivo: userMessage
         });
         atendimentoId = newAtendimentoRef.id;
         console.log(`[${userNumber}] Novo atendimento ${atendimentoId} criado.`);
-
         await updateUserState(userNumber, { state: 'AWAITING_CHOICE' });
         await new Promise(resolve => setTimeout(resolve, 1500));
         await enviarMenuPrincipalComoLista(userNumber, { state: 'AWAITING_CHOICE' });
-        
-        // Este 'return' é o que impedia a execução do código do Pipedrive antes da correção.
-        // Agora, ele pode continuar aqui sem problemas.
         return; 
     }
     
-    // --- LÓGICA PARA CONVERSAS JÁ ATIVAS ---
     console.log(`[${userNumber}] Atendimento ativo ${atendimentoId} encontrado.`);
-
+    
     const messagesRef = db.collection('atendimentos').doc(atendimentoId).collection('mensagens');
     await messagesRef.add({
         texto: userMessage,
         origem: 'cliente',
         enviadaEm: Timestamp.now()
     });
-
-    const docSnap = await db.collection('atendimentos').doc(atendimentoId).get();
-    if (docSnap.exists && docSnap.data().status === 'em_atendimento') {
-        console.log(`[${userNumber}] Atendimento já com humano. Mensagem salva, sem resposta do bot.`);
-        return;
-    }
-
+    
+    const atendimentoRef = db.collection('atendimentos').doc(atendimentoId);
     const userSession = await getUserState(userNumber) || {};
     const originalMsg = typeof userMessage === 'string' ? userMessage.trim() : userMessage;
     const msg = originalMsg.toLowerCase();
-    
     let currentState = userSession.state || 'AWAITING_CHOICE';
     
+    const docSnap = await atendimentoRef.get();
+    if (docSnap.exists) {
+        const currentStatus = docSnap.data().status;
+        
+        if ((currentStatus === 'em_atendimento' || currentStatus === 'aguardando') && currentState !== 'AWAITING_HUMAN_REQUEST_REASON') {
+            console.log(`[${userNumber}] Atendimento com status '${currentStatus}'. Mensagem salva, sem resposta do bot.`);
+            
+            await atendimentoRef.update({ ultimaInteracao: Timestamp.now() });
+            return;
+        }
+    }
+
+    await atendimentoRef.update({ 
+        status: 'navegando',
+        ultimaInteracao: Timestamp.now() 
+    });
+
     console.log(`[${userNumber}] Estado do Bot: ${currentState} | Mensagem: "${userMessage}"`);
 
     if (["menu", "voltar", "cancelar", "continue_shopping"].includes(msg)) {
@@ -238,37 +217,45 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
         delete userSession.checkoutData;
         delete userSession.agendamento;
         await updateUserState(userNumber, userSession);
+        await db.collection('atendimentos').doc(atendimentoId).update({ ultimaInteracao: Timestamp.now() });
         await enviarMenuPrincipalComoLista(userNumber, userSession);
         return;
     }
     
-    // O restante do código (switch case) permanece o mesmo
     switch (currentState) {
-        case 'AWAITING_CHOICE':
+        case 'AWAITING_CHOICE': {
             const intention = getIntention(msg);
             if (intention === "bicicletas (produtos)" || msg === 'menu_produtos') {
                 const botoesBike = [ { id: "bike_estrada", title: "Estrada 🛣️" }, { id: "bike_mtb", title: "MTB (Trilha) 🌄" }, { id: "bike_passeio", title: "Passeio 🌳" } ];
                 await enviarBotoes(userNumber, botMessages.askBikeType, botoesBike);
                 await updateUserState(userNumber, { ...userSession, state: 'AWAITING_BIKE_TYPE' });
-            // --- INÍCIO DO NOVO FLUXO DE PEÇAS E ACESSÓRIOS ---
             } else if (msg === 'menu_pecas' || msg.startsWith('peças e acessórios')) {
-                const pecasOpcoes = [ 
-                    { id: "peca_iluminacao", title: "Iluminação" }, 
-                    { id: "peca_pneumaticos", title: "Pneumáticos" },
-                ];
+                const pecasOpcoes = [ { id: "peca_iluminacao", title: "Iluminação" }, { id: "peca_pneumaticos", title: "Pneumáticos" }, ];
                 await enviarLista(userNumber, botMessages.askPartsCategory, "Categorias", pecasOpcoes);
                 await updateUserState(userNumber, { ...userSession, state: 'AWAITING_PARTS_PRIMARY_CATEGORY' });
-            // --- FIM DO NOVO FLUXO ---
             } else if (intention === "consultar parcelas" || msg === 'menu_financeiro') {
                 await consultarEExibirParcelas(userNumber);
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 await enviarMenuPrincipalComoLista(userNumber, userSession);
             } else if (intention === "revisão / agendamento" || msg === 'menu_agendamento') {
-                const servicos = Object.keys(agendaFixa).map(key => ({ id: key, title: agendaFixa[key].nomeFormatado }));
-                await enviarLista(userNumber, botMessages.askServiceType, "Tipos de Serviço", servicos);
-                await updateUserState(userNumber, { ...userSession, state: 'AWAITING_SCHEDULE_MAIN_TYPE' });
-            }
-            else if (intention === "menu_ver_carrinho") {
+                const servicosRef = db.collection('configuracoesServicos');
+                const servicosSnapshot = await servicosRef.get();
+                if (servicosSnapshot.empty) {
+                    console.error(`[${userNumber}] ERRO: Coleção 'configuracoesServicos' está vazia.`);
+                    await encaminharParaAtendente(userNumber, atendimentoId, "Erro: 'configuracoesServicos' não encontrada no painel.");
+                    break;
+                }
+                const servicosDisponiveis = [];
+                servicosSnapshot.forEach(doc => {
+                    servicosDisponiveis.push({ id: doc.id, title: doc.id }); 
+                });
+                if (servicosDisponiveis.length > 0) {
+                    await updateUserState(userNumber, { ...userSession, state: 'AWAITING_SCHEDULE_SERVICE_SELECTED' });
+                    await enviarLista(userNumber, botMessages.askServiceType, "Tipos de Serviço", servicosDisponiveis);
+                } else {
+                    await encaminharParaAtendente(userNumber, atendimentoId, "Erro: Nenhum serviço configurado no painel.");
+                }
+            } else if (intention === "menu_ver_carrinho") {
                 await enviarResumoCarrinho(userNumber, userSession);
             } else if (intention === "falar com atendente" || msg === 'menu_atendente') {
                 await enviarTexto(userNumber, botMessages.requestHumanHandoffReason);
@@ -278,9 +265,9 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
                 await encaminharParaAtendente(userNumber, atendimentoId, motivo);
             }
             break;
+        }
             
-        // --- INÍCIO NOVOS CASES PARA O FLUXO DE PEÇAS E ACESSÓRIOS ---
-        case 'AWAITING_PARTS_PRIMARY_CATEGORY':
+        case 'AWAITING_PARTS_PRIMARY_CATEGORY': {
             if (msg.includes('iluminação')) {
                 const buttons = [{ id: 'sim', title: 'Sim' }, { id: 'nao', title: 'Não' }];
                 await enviarBotoes(userNumber, botMessages.askIluminacaoHandoff, buttons);
@@ -289,25 +276,24 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
                 const pneumaticoOpcoes = [{ id: 'peca_camaras', title: 'Câmaras' }, { id: 'peca_pneus', title: 'Pneus' }];
                 await enviarLista(userNumber, 'Temos Câmaras e Pneus. Qual você procura?', 'Subcategorias', pneumaticoOpcoes);
                 await updateUserState(userNumber, { ...userSession, state: 'AWAITING_PNEUMATICOS_SUBCATEGORY' });
-            } else {
-                await enviarTexto(userNumber, botMessages.invalidOption);
-            }
+            } else { await enviarTexto(userNumber, botMessages.invalidOption); }
             break;
+        }
         
-        case 'AWAITING_ILUMINACAO_HANDOFF_CONFIRMATION':
+        case 'AWAITING_ILUMINACAO_HANDOFF_CONFIRMATION': {
             if (msg === 'sim') {
                 await encaminharParaAtendente(userNumber, atendimentoId, "Interesse em Peças: Iluminação");
             } else if (msg === 'nao') {
                 await enviarTexto(userNumber, botMessages.partsGoodbye);
-                await updateUserState(userNumber, { ...userSession, state: 'AWAITING_CHOICE' });
+                userSession.state = 'AWAITING_CHOICE';
+                await updateUserState(userNumber, userSession);
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 await enviarMenuPrincipalComoLista(userNumber, userSession);
-            } else {
-                await enviarTexto(userNumber, botMessages.invalidOption);
-            }
+            } else { await enviarTexto(userNumber, botMessages.invalidOption); }
             break;
-
-        case 'AWAITING_PNEUMATICOS_SUBCATEGORY':
+        }
+        
+        case 'AWAITING_PNEUMATICOS_SUBCATEGORY': {
             if (msg.includes('câmaras')) {
                 await enviarTexto(userNumber, botMessages.camarasPriceTable);
                 await new Promise(resolve => setTimeout(resolve, 1500));
@@ -318,139 +304,91 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
                 const pneuSizeButtons = [{ id: 'aro_15', title: 'Aro 15' }, { id: 'aro_20', title: 'Aro 20' }, { id: 'aro_29', title: 'Aro 29' }];
                 await enviarBotoes(userNumber, botMessages.askPneuSize, pneuSizeButtons);
                 await updateUserState(userNumber, { ...userSession, state: 'AWAITING_PNEU_SIZE' });
-            } else {
-                await enviarTexto(userNumber, botMessages.invalidOption);
-            }
+            } else { await enviarTexto(userNumber, botMessages.invalidOption); }
             break;
+        }
         
-        case 'AWAITING_CAMARAS_HANDOFF_CONFIRMATION':
+        case 'AWAITING_CAMARAS_HANDOFF_CONFIRMATION': {
              if (msg === 'sim') {
                 await encaminharParaAtendente(userNumber, atendimentoId, "Interesse em Peças: Câmaras de Ar");
             } else if (msg === 'nao') {
                 await enviarTexto(userNumber, botMessages.partsGoodbye);
-                await updateUserState(userNumber, { ...userSession, state: 'AWAITING_CHOICE' });
+                userSession.state = 'AWAITING_CHOICE';
+                await updateUserState(userNumber, userSession);
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 await enviarMenuPrincipalComoLista(userNumber, userSession);
-            } else {
-                await enviarTexto(userNumber, botMessages.invalidOption);
-            }
+            } else { await enviarTexto(userNumber, botMessages.invalidOption); }
             break;
-
-        case 'AWAITING_PNEU_SIZE':
+        }
+        
+        case 'AWAITING_PNEU_SIZE': {
             let aroSelecionado = '';
             if (msg.includes('15')) aroSelecionado = '15';
             else if (msg.includes('20')) aroSelecionado = '20';
             else if (msg.includes('29')) aroSelecionado = '29';
-
             if (aroSelecionado) {
                 await enviarTexto(userNumber, botMessages.pneuSizeConfirmation(aroSelecionado));
                 await new Promise(resolve => setTimeout(resolve, 1500));
                 const motivo = `Interesse em Peças: Pneus (Aro ${aroSelecionado})`;
                 await encaminharParaAtendente(userNumber, atendimentoId, motivo);
-            } else {
-                 await enviarTexto(userNumber, botMessages.invalidOption);
-            }
+            } else { await enviarTexto(userNumber, botMessages.invalidOption); }
             break;
-        // --- FIM NOVOS CASES PARA O FLUXO DE PEÇAS E ACESSÓRIOS ---
+        }
 
+        case 'AWAITING_SCHEDULE_SERVICE_SELECTED': {
+            const servicoNome = originalMsg;
+            const servicoRef = db.collection('configuracoesServicos').doc(servicoNome);
+            const servicoDoc = await servicoRef.get();
 
-        // --- INÍCIO FLUXO DE AGENDAMENTO ---
-        case 'AWAITING_SCHEDULE_MAIN_TYPE':
-            let selectedServiceKey = null;
-            for (const key in agendaFixa) {
-                if (agendaFixa[key].nomeFormatado.toLowerCase() === msg) {
-                    selectedServiceKey = key;
-                    break;
-                }
-            }
-
-            if (selectedServiceKey) {
-                userSession.agendamento = { tipoPrincipal: selectedServiceKey };
-                if (selectedServiceKey === 'preventiva') {
-                    const subServicos = Object.keys(agendaFixa.preventiva.subServicos).map(key => ({
-                        id: key, title: agendaFixa.preventiva.subServicos[key].nomeFormatado
-                    }));
-                    await updateUserState(userNumber, { ...userSession, state: 'AWAITING_PREVENTIVA_SUBTYPE' });
-                    await enviarLista(userNumber, botMessages.askPreventivaSubType, "Opções", subServicos);
-                } else if (selectedServiceKey === 'corretiva') {
-                    await updateUserState(userNumber, { ...userSession, state: 'AWAITING_CORRETIVA_DESCRIPTION' });
-                    await enviarTexto(userNumber, botMessages.askCorretivaDescription);
-                }
-            } else {
+            if (!servicoDoc.exists) {
                 await enviarTexto(userNumber, botMessages.invalidOption);
-                const servicos = Object.keys(agendaFixa).map(key => ({ id: key, title: agendaFixa[key].nomeFormatado }));
-                await enviarLista(userNumber, botMessages.askServiceType, "Tipos de Serviço", servicos);
+                await encaminharParaAtendente(userNumber, atendimentoId, `Tentativa de agendar serviço inexistente: ${servicoNome}`);
+                break;
             }
-            break;
 
-        case 'AWAITING_PREVENTIVA_SUBTYPE':
-            let selectedSubServiceKey = null;
-            for (const key in agendaFixa.preventiva.subServicos) {
-                if (agendaFixa.preventiva.subServicos[key].nomeFormatado.toLowerCase() === msg) {
-                    selectedSubServiceKey = key;
-                    break;
-                }
+            const servicoData = servicoDoc.data();
+            const diasDisponiveis = Object.keys(servicoData).filter(dia => 
+                diasFormatados[dia] && servicoData[dia].length > 0
+            );
+
+            if (diasDisponiveis.length === 0) {
+                await enviarTexto(userNumber, botMessages.noSchedulesFoundForService(servicoNome));
+                await encaminharParaAtendente(userNumber, atendimentoId, `Serviço ${servicoNome} sem dias configurados.`);
+                break;
             }
+
+            userSession.agendamento = {
+                servicoNome: servicoNome,
+                horariosDoServico: servicoData 
+            };
+
+            const diasLista = diasDisponiveis.map(dia => ({ id: dia, title: diasFormatados[dia] }));
             
-            if (selectedSubServiceKey) {
-                const subServicoInfo = agendaFixa.preventiva.subServicos[selectedSubServiceKey];
-                userSession.agendamento.subTipo = selectedSubServiceKey;
-                userSession.agendamento.servicoNome = subServicoInfo.nomeFormatado;
-                if (subServicoInfo.preco) {
-                    await updateUserState(userNumber, { ...userSession, state: 'AWAITING_PREVENTIVA_CONFIRMATION' });
-                    await enviarBotoes(userNumber, botMessages.askPreventivaConfirmation(subServicoInfo.preco), [{id: 'sim', title: 'Sim, continuar'}, {id: 'nao', title: 'Não, obrigado'}]);
-                } else {
-                    const diasLista = agendaFixa.preventiva.dias.map(dia => ({ id: dia, title: diasFormatados[dia] }));
-                    await updateUserState(userNumber, { ...userSession, state: 'AWAITING_SCHEDULE_DAY' });
-                    await enviarLista(userNumber, botMessages.listAvailableDays(subServicoInfo.nomeFormatado), "Dias Disponíveis", diasLista);
-                }
-            } else {
-                 await enviarTexto(userNumber, botMessages.invalidOption);
-            }
-            break;
-        
-        case 'AWAITING_PREVENTIVA_CONFIRMATION':
-            if (msg === 'sim') {
-                const diasLista = agendaFixa.preventiva.dias.map(dia => ({ id: dia, title: diasFormatados[dia] }));
-                await updateUserState(userNumber, { ...userSession, state: 'AWAITING_SCHEDULE_DAY' });
-                await enviarLista(userNumber, botMessages.listAvailableDays(userSession.agendamento.servicoNome), "Dias Disponíveis", diasLista);
-            } else if (msg === 'nao') {
-                await enviarTexto(userNumber, "Tudo bem. Se mudar de ideia, é só chamar!");
-                delete userSession.agendamento;
-                await updateUserState(userNumber, { ...userSession, state: 'AWAITING_CHOICE'});
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                await enviarMenuPrincipalComoLista(userNumber, userSession);
-            } else {
-                await enviarTexto(userNumber, botMessages.invalidOption);
-            }
-            break;
-
-        case 'AWAITING_CORRETIVA_DESCRIPTION':
-            userSession.agendamento.descricaoProblema = originalMsg;
-            userSession.agendamento.servicoNome = agendaFixa.corretiva.nomeFormatado;
-            const diasListaCorretiva = agendaFixa.corretiva.dias.map(dia => ({ id: dia, title: diasFormatados[dia] }));
             await updateUserState(userNumber, { ...userSession, state: 'AWAITING_SCHEDULE_DAY' });
-            await enviarLista(userNumber, botMessages.listAvailableDays(userSession.agendamento.servicoNome), "Dias Disponíveis", diasListaCorretiva);
+            await enviarLista(userNumber, botMessages.listAvailableDays(servicoNome), "Dias Disponíveis", diasLista);
             break;
+        }
 
-        case 'AWAITING_SCHEDULE_DAY':
-            const tipoAgendamento = userSession.agendamento.tipoPrincipal;
+        case 'AWAITING_SCHEDULE_DAY': {
             let diaSelecionado = msg; 
-
-            if (!agendaFixa[tipoAgendamento].dias.includes(diaSelecionado)) {
+            if (!diasFormatados[diaSelecionado]) {
                 const diaKeyEncontrado = Object.keys(diasFormatados).find(key => diasFormatados[key].toLowerCase() === msg);
                 if (diaKeyEncontrado) {
                     diaSelecionado = diaKeyEncontrado;
                 }
             }
+
+            const horariosDoServico = userSession.agendamento.horariosDoServico;
             
-            if (agendaFixa[tipoAgendamento] && agendaFixa[tipoAgendamento].dias.includes(diaSelecionado)) {
+            if (horariosDoServico && horariosDoServico[diaSelecionado] && horariosDoServico[diaSelecionado].length > 0) {
                 userSession.agendamento.dia = diaSelecionado;
-                const horariosPadrao = agendaFixa[tipoAgendamento].horarios;
+                const horariosPadrao = horariosDoServico[diaSelecionado]; 
+
                 const agendamentosRef = db.collection('agendamentos');
                 const q = agendamentosRef.where('dia', '==', diaSelecionado).where('status', '==', 'pendente');
                 const snapshot = await q.get();
                 const horariosOcupados = snapshot.docs.map(doc => doc.data().horario);
+                
                 const horariosDisponiveis = horariosPadrao.filter(h => !horariosOcupados.includes(h));
 
                 if (horariosDisponiveis.length > 0) {
@@ -465,39 +403,25 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
                 await enviarTexto(userNumber, botMessages.invalidDay);
             }
             break;
+        }
         
-        case 'AWAITING_SCHEDULE_TIME':
-            const { tipoPrincipal, dia, servicoNome } = userSession.agendamento;
-            const horariosPadrao = agendaFixa[tipoPrincipal].horarios;
+        case 'AWAITING_SCHEDULE_TIME': {
+            const horarioSelecionado = msg; 
+            const { servicoNome, dia, horariosDoServico } = userSession.agendamento;
+            
+            const horariosPadrao = horariosDoServico[dia];
             const agendamentosRefTime = db.collection('agendamentos');
             const qTime = agendamentosRefTime.where('dia', '==', dia).where('status', '==', 'pendente');
             const snapshotTime = await qTime.get();
             const horariosOcupados = snapshotTime.docs.map(doc => doc.data().horario);
             const horariosDisponiveis = horariosPadrao.filter(h => !horariosOcupados.includes(h));
 
-            if (horariosDisponiveis.includes(msg)) {
-                userSession.agendamento.horario = msg;
+            if (horariosDisponiveis.includes(horarioSelecionado)) {
+                userSession.agendamento.horario = horarioSelecionado;
                 try {
                     await criarAgendamento(userNumber, userName, userSession.agendamento);
                     const diaFormatado = diasFormatados[dia];
-                    await enviarTexto(userNumber, botMessages.bookingSuccess(servicoNome, diaFormatado, msg));
-
-                    // --- INÍCIO DA INTEGRAÇÃO PIPEDRIVE: CRIAÇÃO DE NEGÓCIO PARA AGENDAMENTO ---
-                    try {
-                        const person = await Pipedrive.findPersonByPhone(userNumber);
-                        if (person) {
-                            const dealTitle = `Agendamento: ${servicoNome} - ${person.name}`;
-                            const deal = await Pipedrive.createDeal(dealTitle, person.id);
-                            if (deal) {
-                                const nota = `Serviço: ${servicoNome}\nDia: ${diaFormatado}\nHorário: ${msg}\nDescrição: ${userSession.agendamento.descricaoProblema || 'N/A'}`;
-                                await Pipedrive.addNoteToDeal(nota, deal.id);
-                            }
-                        }
-                    } catch(error) {
-                        console.error(`[Pipedrive] Falha ao criar negócio para agendamento ${userNumber}:`, error);
-                    }
-                    // --- FIM DA INTEGRAÇÃO PIPEDRIVE ---
-
+                    await enviarTexto(userNumber, botMessages.bookingSuccess(servicoNome, diaFormatado, horarioSelecionado));
                     delete userSession.agendamento;
                     await updateUserState(userNumber, {...userSession, state: 'AWAITING_CHOICE'});
                     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -510,41 +434,22 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
                 await enviarTexto(userNumber, botMessages.invalidTime);
             }
             break;
-        // --- FIM FLUXO DE AGENDAMENTO ---
+        }
 
-        // /backend/botLogic.js
-
-        case 'AWAITING_HUMAN_REQUEST_REASON':
+        case 'AWAITING_HUMAN_REQUEST_REASON': {
             const motivo = userMessage;
-            // Adicionamos o 'status: aguardando' aqui
             await db.collection('atendimentos').doc(atendimentoId).update({ 
                 motivo: motivo, 
-                status: 'aguardando'
+                status: 'aguardando',
+                atendimentoIniciadoEm: Timestamp.now()
             });
-            await enviarTexto(userNumber, botMessages.humanRequestSuccess);
+            await enviarTexto(userNumber, botMessages.humanRequestSuccess); 
             console.log(`[${userNumber}] Motivo do atendimento ${atendimentoId} atualizado para: "${motivo}"`);
-            
-            // --- INÍCIO DA INTEGRAÇÃO PIPEDRIVE: CRIAÇÃO DE NEGÓCIO PARA ATENDIMENTO ---
-            // Como a função encaminharParaAtendente não é chamada aqui, criamos o negócio diretamente.
-            try {
-                const person = await Pipedrive.findPersonByPhone(userNumber);
-                if (person) {
-                    const dealTitle = `Solicitação de Ajuda - ${person.name}`;
-                    const deal = await Pipedrive.createDeal(dealTitle, person.id);
-                    if (deal) {
-                        const nota = `Dúvida do cliente: ${motivo}\n\nID do Atendimento no sistema interno: ${atendimentoId}`;
-                        await Pipedrive.addNoteToDeal(nota, deal.id);
-                    }
-                }
-            } catch(error) {
-                console.error(`[Pipedrive] Falha ao criar negócio para ${userNumber}:`, error);
-            }
-            // --- FIM DA INTEGRAÇÃO PIPEDRIVE ---
-
             await deleteUserState(userNumber);
             break;
+        }
 
-        case 'AWAITING_BIKE_TYPE':
+        case 'AWAITING_BIKE_TYPE': {
             let bikeType = null;
             if (msg === 'bike_estrada') bikeType = 'estrada';
             if (msg === 'bike_mtb') bikeType = 'mtb';
@@ -556,50 +461,40 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
                 await encaminharParaAtendente(userNumber, atendimentoId, motivo);
             }
             break;
+        }
         
-        // --- CASE DE SELEÇÃO DE PRODUTO (COM CORREÇÃO) ---
-        case 'AWAITING_PRODUCT_SELECTION_FOR_CART':
+        case 'AWAITING_PRODUCT_SELECTION_FOR_CART': {
             const productMap = userSession.displayedProducts || {};
             let productId = null;
-
-            // Lógica corrigida: Encontra o produto cujo nome completo COMEÇA com o texto recebido.
-            // Isso resolve o problema de textos truncados ("...") pelo WhatsApp.
             const possibleProduct = Object.keys(productMap).find(fullName => 
                 originalMsg.endsWith('...') ? fullName.startsWith(originalMsg.slice(0, -3)) : fullName === originalMsg
             );
-
-            if (possibleProduct) {
-                productId = productMap[possibleProduct];
+            
+            if (possibleProduct) { 
+                productId = productMap[possibleProduct]; 
+            } else if (msg.startsWith('add_')) {
+                productId = msg.split('add_')[1];
             }
             
             if (productId) {
                 const productRef = db.collection('produtos').doc(productId);
                 const productSnap = await productRef.get();
-
                 if (productSnap.exists) {
                     const productData = productSnap.data();
                     if (productData.estoque && productData.estoque > 0) {
                         if (!userSession.cart) userSession.cart = [];
-                        
                         const itemNoCarrinho = userSession.cart.find(item => item.productId === productId);
                         if (itemNoCarrinho) {
                             itemNoCarrinho.quantidade++;
                         } else {
-                            userSession.cart.push({ 
-                                productId: productId, 
-                                nome: productData.nome, 
-                                preco: productData.preco, 
-                                quantidade: 1 
-                            });
+                            userSession.cart.push({ productId: productId, nome: productData.nome, preco: productData.preco, quantidade: 1 });
                         }
-                        
                         delete userSession.displayedProducts;
                         await updateUserState(userNumber, { ...userSession, state: 'AWAITING_POST_ADD_ACTION' });
                         await enviarTexto(userNumber, botMessages.itemAddedToCart(productData.nome));
                         const botoesPosCarrinho = [ { id: "view_cart", title: "🛒 Ver Carrinho" }, { id: "continue_shopping", title: "Continuar a Comprar" } ];
                         await new Promise(resolve => setTimeout(resolve, 500));
                         await enviarBotoes(userNumber, botMessages.afterAddToCartOptions, botoesPosCarrinho);
-
                     } else {
                         await enviarTexto(userNumber, botMessages.productOutOfStock(productData.nome));
                         delete userSession.displayedProducts;
@@ -613,8 +508,9 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
                 await encaminharParaAtendente(userNumber, atendimentoId, motivo);
             }
             break;
+        }
         
-        case 'AWAITING_POST_ADD_ACTION':
+        case 'AWAITING_POST_ADD_ACTION': {
             if (msg === 'view_cart') {
                 await enviarResumoCarrinho(userNumber, userSession);
             } else {
@@ -622,8 +518,9 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
                 await encaminharParaAtendente(userNumber, atendimentoId, motivo);
             }
             break;
+        }
 
-        case 'AWAITING_CART_ACTION':
+        case 'AWAITING_CART_ACTION': {
             if (msg === 'checkout') {
                 await enviarTexto(userNumber, botMessages.askForName);
                 await updateUserState(userNumber, {...userSession, state: 'CHECKOUT_AWAITING_NAME' });
@@ -637,47 +534,29 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
                 await encaminharParaAtendente(userNumber, atendimentoId, motivo);
             }
             break;
+        }
 
-        case 'CHECKOUT_AWAITING_NAME':
+        case 'CHECKOUT_AWAITING_NAME': {
             userSession.checkoutData = { name: originalMsg };
             await updateUserState(userNumber, { ...userSession, state: 'CHECKOUT_AWAITING_ADDRESS'});
             await enviarTexto(userNumber, botMessages.askForAddress(originalMsg));
             break;
+        }
 
-        case 'CHECKOUT_AWAITING_ADDRESS':
+        case 'CHECKOUT_AWAITING_ADDRESS': {
             userSession.checkoutData.address = originalMsg;
             const paymentButtons = [ { id: "payment_pix", title: "PIX" }, { id: "payment_card", title: "Cartão (Link)" }, { id: "payment_delivery", title: "Pagar na Entrega" } ];
             await updateUserState(userNumber, { ...userSession, state: 'CHECKOUT_AWAITING_PAYMENT' });
             await enviarBotoes(userNumber, botMessages.askForPayment, paymentButtons);
             break;
+        }
             
-        case 'CHECKOUT_AWAITING_PAYMENT':
+        case 'CHECKOUT_AWAITING_PAYMENT': {
             userSession.checkoutData.payment = originalMsg;
             try {
                 const result = await criarPedidoEnotificarAdmin(userNumber, userName, userSession, atendimentoId);
                 if (result.success) {
                     await enviarTexto(userNumber, botMessages.orderSuccess(result.orderId));
-                    
-                    // --- INÍCIO DA INTEGRAÇÃO PIPEDRIVE: CRIAÇÃO DE NEGÓCIO PARA PEDIDO ---
-                    try {
-                        const person = await Pipedrive.findPersonByPhone(userNumber);
-                        if (person) {
-                            // Atualiza o nome do contato no Pipedrive com o nome completo informado no checkout
-                            await Pipedrive.updatePersonName(person.id, userSession.checkoutData.name);
-                            const dealTitle = `Pedido #${result.orderId} - ${userSession.checkoutData.name}`;
-                            const deal = await Pipedrive.createDeal(dealTitle, person.id, result.totalValue);
-                            if (deal) {
-                                const nota = `Itens: ${result.itemsSummary}\nValor Total: R$ ${result.totalValue.toFixed(2)}\nPagamento: ${userSession.checkoutData.payment}\nEndereço: ${userSession.checkoutData.address}`;
-                                await Pipedrive.addNoteToDeal(nota, deal.id);
-                                // Opcional: Mover o negócio para uma etapa de "Pagamento Pendente" ou "Ganho"
-                                // await Pipedrive.updateDealStage(deal.id, ID_DA_ETAPA_GANHO);
-                            }
-                        }
-                    } catch(error) {
-                        console.error(`[Pipedrive] Falha ao criar negócio para o pedido ${result.orderId}:`, error);
-                    }
-                    // --- FIM DA INTEGRAÇÃO PIPEDRIVE ---
-
                     await deleteUserState(userNumber);
                     await new Promise(resolve => setTimeout(resolve, 2000));
                     await enviarMenuPrincipalComoLista(userNumber, {});
@@ -694,6 +573,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId) {
                 await encaminharParaAtendente(userNumber, atendimentoId, motivo);
             }
             break;
+        }
     }
 }
 
@@ -705,7 +585,6 @@ async function enviarMenuPrincipalComoLista(userNumber, userSession) {
     }
     menuItens.push(
         { id: "menu_produtos", title: "Bicicletas (Produtos) 🚲" },
-        // --- OPÇÃO DE PEÇAS ATUALIZADA ---
         { id: "menu_pecas", title: "Peças e Acessórios 🛠️" },
         { id: "menu_financeiro", title: "Consultar Parcelas 💰" },
         { id: "menu_agendamento", title: "Revisão / Agendamento ⚙️" },
@@ -714,19 +593,16 @@ async function enviarMenuPrincipalComoLista(userNumber, userSession) {
     await updateUserState(userNumber, { ...userSession, state: 'AWAITING_CHOICE' });
     await enviarLista(userNumber, textoBoasVindas, "Menu Principal", menuItens);
 }
-
 async function consultarEExibirParcelas(userNumber) {
     try {
         await enviarTexto(userNumber, botMessages.financeHeader);
         const vendasRef = db.collection('vendasParceladas');
         const q = vendasRef.where('cliente_id', '==', userNumber).where('status_venda', '==', 'ativa');
         const snapshot = await q.get();
-
         if (snapshot.empty) {
             await enviarTexto(userNumber, botMessages.financeNotFound);
             return;
         }
-
         let pendingInstallmentsFound = [];
         snapshot.forEach(doc => {
             const venda = doc.data();
@@ -734,7 +610,6 @@ async function consultarEExibirParcelas(userNumber) {
                 const nextPending = venda.parcelas
                     .filter(p => p.status === 'pendente')
                     .sort((a, b) => a.numero - b.numero)[0]; 
-
                 if (nextPending) {
                     pendingInstallmentsFound.push({
                         produto_nome: venda.produto_nome,
@@ -743,7 +618,6 @@ async function consultarEExibirParcelas(userNumber) {
                 }
             }
         });
-
         if (pendingInstallmentsFound.length === 0) {
             await enviarTexto(userNumber, botMessages.financeNoPending);
         } else {
@@ -757,9 +631,8 @@ async function consultarEExibirParcelas(userNumber) {
         await enviarTexto(userNumber, botMessages.financeError);
     }
 }
-
 async function criarAgendamento(userNumber, userName, agendamentoInfo) {
-    const { servicoNome, dia, horario, descricaoProblema } = agendamentoInfo;
+    const { servicoNome, dia, horario } = agendamentoInfo;
     const novoAgendamento = {
         cliente: userNumber,
         cliente_nome: userName,
@@ -769,17 +642,10 @@ async function criarAgendamento(userNumber, userName, agendamentoInfo) {
         status: 'pendente',
         criadoEm: Timestamp.now()
     };
-    if (descricaoProblema) {
-        novoAgendamento.descricao_problema = descricaoProblema;
-    }
     const agendamentoRef = await db.collection('agendamentos').add(novoAgendamento);
     console.log(`[${userNumber}] Agendamento ${agendamentoRef.id} criado com sucesso.`);
     return agendamentoRef;
 }
-
-// ==================================================================================
-// --- FUNÇÃO DE CATÁLOGO (COM CORREÇÃO DE LIMITE DE CARACTERES) ---
-// ==================================================================================
 async function enviarCatalogoDeProdutos(userNumber, userSession, bikeType, atendimentoId) {
     try {
         const produtosRef = db.collection('produtos');
@@ -795,16 +661,14 @@ async function enviarCatalogoDeProdutos(userNumber, userSession, bikeType, atend
         const productMap = {};
         for (const doc of snapshot.docs) {
             const produto = doc.data();
-            
-            // --- CORREÇÃO APLICADA AQUI ---
-            // Garante que o título não passe de 24 caracteres, como exige a API do WhatsApp.
             const tituloCurto = produto.nome.length > 24 ? produto.nome.substring(0, 21) + '...' : produto.nome;
-            
             produtosParaAdicionar.push({ id: `add_${doc.id}`, title: tituloCurto });
-            productMap[produto.nome] = doc.id; // O mapa ainda usa o nome completo para lógica interna
-            
+            productMap[produto.nome] = doc.id; 
             const legenda = botMessages.productCaption(produto);
-            await enviarImagem(userNumber, produto.imagemUrl, legenda);
+
+            // CORRIGIDO: 'enviarImagem' -> 'enviarImagemComLegenda'
+            await enviarImagemComLegenda(userNumber, produto.imagemUrl, legenda);
+            
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
         await new Promise(resolve => setTimeout(resolve, 1500));
@@ -816,7 +680,6 @@ async function enviarCatalogoDeProdutos(userNumber, userSession, bikeType, atend
         await encaminharParaAtendente(userNumber, atendimentoId, motivo);
     }
 }
-
 async function enviarResumoCarrinho(userNumber, userSession) {
     if (!userSession.cart || userSession.cart.length === 0) {
         await enviarTexto(userNumber, botMessages.cartEmpty);
@@ -840,41 +703,28 @@ async function enviarResumoCarrinho(userNumber, userSession) {
     await updateUserState(userNumber, { ...userSession, state: 'AWAITING_CART_ACTION' });
     await enviarBotoes(userNumber, botMessages.cartActionsPrompt, botoesAcaoCarrinho);
 }
-
 async function criarPedidoEnotificarAdmin(userNumber, userName, userSession, atendimentoId) {
     const { cart, checkoutData } = userSession;
-    
     return db.runTransaction(async (transaction) => {
         const productRefs = cart.map(item => db.collection('produtos').doc(item.productId));
         const productDocs = await transaction.getAll(...productRefs);
-
         for (let i = 0; i < productDocs.length; i++) {
             const productDoc = productDocs[i];
             const item = cart[i];
-
-            if (!productDoc.exists) {
-                throw new Error(`Produto ${item.nome} não encontrado.`);
-            }
-
+            if (!productDoc.exists) { throw new Error(`Produto ${item.nome} não encontrado.`); }
             const currentStock = productDoc.data().estoque;
             if (currentStock < item.quantidade) {
-                // Lança um erro customizado para ser tratado no 'catch'
                 const error = new Error(`Estoque insuficiente para ${item.nome}.`);
                 error.productName = item.nome;
                 error.isStockError = true;
                 throw error;
             }
         }
-        
-        // Se todas as verificações passaram, debita o estoque
         for (let i = 0; i < productDocs.length; i++) {
             const productRef = productRefs[i];
             const item = cart[i];
-            transaction.update(productRef, {
-                estoque: FieldValue.increment(-item.quantidade)
-            });
+            transaction.update(productRef, { estoque: FieldValue.increment(-item.quantidade) });
         }
-        
         let total = 0;
         cart.forEach(item => total += item.preco * item.quantidade);
         const novoPedido = {
@@ -888,29 +738,29 @@ async function criarPedidoEnotificarAdmin(userNumber, userName, userSession, ate
             status_pedido: 'recebido',
             criadoEm: Timestamp.now()
         };
-
         const pedidoRef = db.collection('pedidos').doc();
         transaction.set(pedidoRef, novoPedido);
-        
         const resumoPedidoParaCRM = cart.map(item => `${item.quantidade}x ${item.nome}`).join(', ');
         const motivo = `NOVO PEDIDO #${pedidoRef.id.substring(0, 5)} - ${resumoPedidoParaCRM}`;
-        const atendimentoRef = db.collection('atendimentos').doc(atendimentoId);
-        transaction.update(atendimentoRef, { motivo: motivo, cliente_nome: checkoutData.name });
-
-        // Retorna mais dados para a integração com o Pipedrive
+        
+        const docAtendimentoRef = db.collection('atendimentos').doc(atendimentoId);
+        transaction.update(docAtendimentoRef, { 
+            motivo: motivo, 
+            cliente_nome: checkoutData.name,
+            status: 'resolvido'
+        });
+        
         return { 
             success: true, 
             orderId: pedidoRef.id.substring(0, 5).toUpperCase(),
             totalValue: total,
             itemsSummary: resumoPedidoParaCRM
         };
-
     }).catch(error => {
         console.error(`[${userNumber}] Falha na transação de criação de pedido:`, error.message);
         if (error.isStockError) {
             return { success: false, productName: error.productName };
         }
-        // Lança outros erros para serem tratados como erro genérico
         throw error;
     });
 }

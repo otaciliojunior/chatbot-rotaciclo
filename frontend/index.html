@@ -1,40 +1,252 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Rota Ciclo | Login</title>
-        
-        <link rel="stylesheet" href="style.css">
-        
-        <link rel="stylesheet" href="login.css">
-        
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    </head>
-<body class="login-page">
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Atendimento</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
 
-    <div class="login-container">
-        <div class="logo">Rota Ciclo</div>
-        <p class="login-subtitle">Acesse seu painel de CRM</p>
-        
-        <form id="login-form">
-            <div class="form-group">
-                <label for="login-email">Email</label>
-                <input type="email" id="login-email" required>
+    <div class="dashboard-container">
+
+        <nav class="nav-sidebar">
+            <button class="nav-icon active" id="nav-chat" aria-label="Chats">
+                <span class="material-symbols-outlined">chat</span>
+            </button>
+            <button class="nav-icon" id="nav-contacts" aria-label="Contatos">
+                <span class="material-symbols-outlined">contacts</span>
+            </button>
+            <button class="nav-icon" id="nav-settings" aria-label="Configurações">
+                <span class="material-symbols-outlined">settings</span>
+            </button>
+        </nav>
+
+        <aside class="chat-list-sidebar">
+
+            <div class="sidebar-panel active" id="panel-chat-list">
+                <header class="sidebar-header">
+                    <div class="search-container">
+                        <label for="search-chat-input" class="visually-hidden">Pesquisar ou começar novo chat</label>
+                        <span class="material-symbols-outlined">search</span>
+                        <input type="search" id="search-chat-input" placeholder="Pesquisar ou começar novo chat">
+                    </div>
+                </header>
+                <div class="chat-list" id="chat-list">
+                    </div>
             </div>
-            <div class="form-group">
-                <label for="login-password">Senha</label>
-                <input type="password" id="login-password" required>
+
+            <div class="sidebar-panel hidden" id="panel-contacts">
+                <header class="sidebar-header">
+                    <div class="search-container">
+                        <label for="search-contacts-input" class="visually-hidden">Pesquisar no histórico</label>
+                        <span class="material-symbols-outlined">search</span>
+                        <input type="search" id="search-contacts-input" placeholder="Pesquisar no histórico...">
+                    </div>
+                </header>
+                <div class="chat-list" id="contact-history-list">
+                    </div>
             </div>
-            <p id="login-error" class="login-error-message"></p>
-            <button type="submit" id="login-button" class="save-btn full-width">Entrar</button>
-        </form>
-    </div>
+            
+            <div class="sidebar-panel hidden" id="panel-settings">
+                <header class="sidebar-header">
+                    <h2>Configurações</h2>
+                </header>
+                
+                <div class="panel-body settings-panel">
+    
+                    <div class="settings-section">
+                        <h3 class="settings-title">Perfil do Operador</h3>
+                        <div class="profile-card">
+                            <div class="avatar-initials-large" id="settings-avatar">OP</div> 
+                            <div class="profile-info">
+                                <span class="profile-name" id="settings-profile-name">Nome do Operador</span>
+                                <span class="profile-email" id="settings-profile-email">operador@email.com</span>
+                            </div>
+                        </div>
+                        <button class="settings-button-secondary">Alterar Senha</button>
+                    </div>
 
-    <script type="module" src="firebase.js"></script>
-    <script type="module" src="index.js"></script>
+                    <div class="settings-section">
+                        <h3 class="settings-title">Notificações</h3>
+                        <div class="settings-option">
+                            <label for="toggle-sound">Notificações Sonoras</label>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="toggle-sound" checked>
+                                <label for="toggle-sound" class="slider"></label>
+                            </div>
+                        </div>
+                        <div class="settings-option">
+                            <label for="toggle-desktop">Notificações de Desktop</label>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="toggle-desktop" checked>
+                                <label for="toggle-desktop" class="slider"></label>
+                            </div>
+                        </div>
+                    </div>
 
+                    <div class="settings-section">
+                        <h3 class="settings-title">Aparência</h3>
+                        <div class="settings-option">
+                            <label for="theme-select">Tema</label>
+                            <select id="theme-select" class="settings-select">
+                                <option value="light">Claro</option>
+                                <option value="dark" disabled>Escuro (Em breve)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 class="settings-title">Atalhos</h3>
+                        <button class="settings-button-primary">Gerenciar Respostas Rápidas</button>
+                    </div>
+            
+                    <div class="settings-section logout-section">
+                         <button class="settings-button-danger" id="logout-button">
+                            <span class="material-symbols-outlined">logout</span>
+                            Sair da Conta
+                        </button>
+                    </div>
+            
+                </div>
+
+            </div>
+
+        </aside>
+
+        <div class="main-content-wrapper" id="main-content-wrapper">
+
+            <main class="chat-empty-state" id="chat-empty-state">
+                <div class="empty-state-content">
+                    <span class="material-symbols-outlined empty-icon">chat</span>
+                    <h2>Dashboard de Atendimento</h2>
+                    <p>Selecione um atendimento na lista à esquerda para começar a conversar.</p>
+                    <p class="footer-note">Mantendo o seu negócio conectado.</p>
+                </div>
+            </main>
+
+            <main class="chat-window hidden" id="chat-window">
+                
+                <header class="chat-header">
+                    <div class="avatar-initials" id="active-chat-avatar">?</div>
+                    
+                    <div class="contact-details">
+                        <span class="contact-name" id="active-chat-name">Carregando...</span>
+                        <span class="contact-status"></span>
+                    </div>
+
+                    <div class="header-icons">
+                        <button class="icon-button" aria-label="Pesquisar nesta conversa">
+                            <span class="material-symbols-outlined">search</span>
+                        </button>
+                        <button class="icon-button" id="toggle-info-panel" aria-label="Mostrar detalhes do cliente">
+                            <span class="material-symbols-outlined">info</span>
+                        </button>
+                        
+                        <div class="chat-options-wrapper">
+                            <button class="icon-button" id="chat-options-trigger" aria-label="Mais opções">
+                                <span class="material-symbols-outlined">more_vert</span>
+                            </button>
+                            <div class="dropdown-menu hidden" id="chat-options-menu">
+                                <button class="dropdown-item" id="finish-chat-button">
+                                    <span class="material-symbols-outlined">check_circle</span>
+                                    Finalizar Atendimento
+                                </button>
+                                </div>
+                        </div>
+
+                    </div>
+                </header>
+
+                <div class="message-container" id="message-container">
+                    </div>
+
+                <footer class="message-input-area">
+                
+                <div class="file-preview-container hidden" id="file-preview-container">
+                    <button class="icon-button remove-preview" id="remove-preview" aria-label="Remover anexo">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                    <img src="" alt="Preview do anexo" class="preview-thumbnail" id="preview-image">
+                </div>
+
+                <div class="quick-reply-popup hidden" id="quick-reply-popup">
+                    <header class="quick-reply-header">
+                        Respostas Rápidas (digite "/" para filtrar)
+                    </header>
+                    <div class="quick-reply-list" id="quick-reply-list">
+                        </div>
+                </div>
+                
+                <button class="icon-button" aria-label="Abrir seletor de emoji">
+                    <span class="material-symbols-outlined">sentiment_satisfied</span>
+                </button>
+                
+                <button class="icon-button" id="attach-file-trigger" aria-label="Anexar arquivo">
+                    <span class="material-symbols-outlined">attach_file</span>
+                </button>
+                
+                <input type="file" id="file-input" accept="image/*" hidden>
+                
+                <button class="icon-button" id="quick-reply-trigger" aria-label="Abrir respostas rápidas">
+                    <span class="material-symbols-outlined">bolt</span>
+                </button>
+                
+                <label for="message-input" class="visually-hidden">Digite sua mensagem</label>
+                <input type="text" id="message-input" placeholder="Digite sua mensagem... (ou digite /)">
+                
+                <button class="send-button" id="send-button" aria-label="Enviar mensagem">
+                    <span class="material-symbols-outlined">send</span>
+                </button>
+            </footer>
+
+            </main>
+
+            <aside class="client-info-panel" id="client-info-panel">
+                
+                <header class="info-panel-header">
+                    <h3>Detalhes do Cliente</h3>
+                    <button class="icon-button" id="close-info-panel" aria-label="Fechar detalhes do cliente">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </header>
+
+                <div class="info-panel-body">
+                    <div class="info-contact-summary">
+                        <div class="avatar-initials-large" id="info-panel-avatar">?</div>
+                        <h4 id="info-panel-name">Carregando...</h4>
+                    </div>
+                    
+                    <div class="info-field">
+                        <span class="info-label">Telefone</span>
+                        <span class="info-value" id="info-panel-phone">Carregando...</span>
+                    </div>
+                    
+                    <div class="info-field">
+                        <span class="info-label">Email</span>
+                        <span class="info-value" id="info-panel-email">Carregando...</span>
+                    </div>
+
+                    <div class="info-field">
+                        <span class="info-label">Tags</span>
+                        <div class="info-tags-container" id="info-panel-tags">
+                            </div>
+                    </div>
+
+                    <div class="info-field">
+                        <span class="info-label">Notas do Atendente</span>
+                        <textarea id="info-panel-notes" placeholder="Adicione notas sobre este cliente..."></textarea>
+                    </div>
+                </div>
+            </aside>
+            </div> 
+    </div> 
+    
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>
