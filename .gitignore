@@ -1,6 +1,18 @@
-# Arquivos de ambiente e chaves secretas do backend
-/backend/.env
-/backend/serviceAccountKey.json
+# Dependências do Node.js
+node_modules/
+backend/node_modules/
+functions/node_modules/
 
-# Dependências do backend
-/backend/node_modules
+# Arquivos de Segredos e Configuração
+.env
+*.env
+backend/.env
+functions/.env
+
+# Logs de Debug
+*.log
+firebase-debug.log
+
+# Arquivos de Sistema
+.DS_Store
+Thumbs.db
