@@ -16,3 +16,6 @@ firebase-debug.log
 # Arquivos de Sistema
 .DS_Store
 Thumbs.db
+
+# Ignora a chave de serviço do Google
+backend/serviceAccountKey.json
