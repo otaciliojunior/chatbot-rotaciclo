@@ -287,7 +287,7 @@ async function checkHumanInactivity() {
             const lastMsg = ultimasMensagensSnap.docs[0].data();
             const lastMsgTime = lastMsg.enviadaEm.toMillis();
             
-            if (lastMsg.origem === 'agente' && lastMsgTime < avisoThreshold) {
+            if (lastMsg.origem === 'atendente' && lastMsgTime < avisoThreshold) {
                 const clienteId = doc.data().cliente_id;
                 console.log(`[AVISO] Chat ${doc.id} (Cliente: ${clienteId}) inativo. Enviando aviso.`);
                 
