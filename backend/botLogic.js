@@ -53,7 +53,7 @@ const botMessages = {
     invalidTime: "Esse horário não rola 😬. Escolhe um dos que eu te mostrei.",
     bookingSuccess: (service, day, time) => `✅ Agendamento confirmado!\n\nSeu serviço de *${service}* foi marcado para *${day}* às *${time}*.\n\nObrigado por escolher a Rota Ciclo! 🚴‍♂️`,
     adHandoff: (userName) => `Olá, ${userName}! Vi que você se interessou pelo nosso anúncio. Excelente escolha! 🤩\n\nJá estou passando sua solicitação para um especialista que vai te dar todos os detalhes. Só aguarda um pouquinho!`,
-    requestHumanHandoffReason: "Beleza! Pra agilizar, me conta em uma mensagem só qual é a sua dúvida principal.\n\n_(Obs: não consigo entender áudios, só texto 🫱🏽‍🏽)_",
+    requestHumanHandoffReason: "Beleza! Pra agilizar, me conta em uma mensagem só qual é a sua dúvida principal.\n\n_(Obs: não consigo entender áudios, só texto 🫱🏼‍🫲🏽)_",
     humanRequestSuccess: "Pronto! Sua solicitação já tá na fila. Um dos nossos vai falar contigo aqui mesmo, só aguarda um pouquinho 😉.",
     humanHandoff: "Entendi. Para te ajudar melhor com isso, estou te transferindo para um de nossos especialistas. Em instantes, alguém falará com você aqui mesmo. 👍",
     humanRequestError: "Deu erro ao registrar sua solicitação 😕. Tenta de novo mais tarde ou chama a gente no (84) 8750-4756",
@@ -169,7 +169,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
             status: 'navegando',
             solicitadoEm: Timestamp.now(),
             ultimaInteracao: Timestamp.now(),
-            motivo: userMessage
+            motivo: null
         });
         atendimentoId = newAtendimentoRef.id;
 
