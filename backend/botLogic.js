@@ -8,7 +8,7 @@ const {
 } = require('./whatsappClient');
 
 const botMessages = {
-    welcomeFirstTime: (userName) => `Fala, ${userName}! Bem-vindo(a) à *Rota Ciclo*! Esse é nosso novo canal de atendimento automático, feito para deixar sua experiência mais prática e aproximar você ainda mais da nossa loja. Bora pedalar junto nessa nova rota? 🚴🏼`,
+    welcomeFirstTime: (userName) => `Fala, ${userName}! Bem-vindo(a) à *Rota Ciclo*! Esse é nosso novo canal de atendimento automático, feito para deixar sua experiência mais prática e aproximar você ainda mais da nossa loja. Bora pedalar junto nessasSwnova rota? 🚴🏼`,
     welcomeReturn: (userName) => `Fala, ${userName}! Bem-vindo(a) de volta à *Rota Ciclo*!`,
     invalidOption: "Ops, não entendi essa opção 🤔. Tenta clicar em uma das opções do menu, beleza?",
     thankYou: "Beleza! Se precisar de mais alguma coisa, é só chamar.",
@@ -481,11 +481,11 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
             const possibleProduct = Object.keys(productMap).find(fullName => 
                 originalMsg.endsWith('...') ? fullName.startsWith(originalMsg.slice(0, -3)) : fullName === originalMsg
             );
-
+            
             if (possibleProduct) { 
                 productId = productMap[possibleProduct]; 
-            } else if (originalMsg.startsWith('add_')) { 
-                productId = originalMsg.split('add_')[1]; 
+            } else if (originalMsg.startsWith('add_')) {
+                productId = originalMsg.split('add_')[1];
             }
             
             if (productId) {
@@ -585,11 +585,53 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
             userSession.checkoutData.payment = originalMsg;
             try {
                 const result = await criarPedidoEnotificarAdmin(userNumber, userName, userSession, atendimentoId);
+                
                 if (result.success) {
+                    
+                    // ===================================
+                    // INÍCIO DA NOVA FUNCIONALIDADE
+                    // ===================================
+                    
+                    const { cart, checkoutData } = userSession;
+                    let total = 0;
+                    const itemsResumo = cart.map(item => {
+                        total += item.preco * item.quantidade;
+                        return `• ${item.quantidade}x ${item.nome} (${(item.preco * item.quantidade).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})`;
+                    }).join('\n');
+                    
+                    const paymentMethod = checkoutData.payment.replace('payment_', '').toUpperCase();
+
+                    const summaryMessage = `🧾 *RESUMO DO NOVO PEDIDO* 🧾
+---------------------------------
+*Cliente:* ${checkoutData.name}
+*Endereço:* ${checkoutData.address}
+*Pagamento:* ${paymentMethod}
+---------------------------------
+*Itens do Pedido:*
+${itemsResumo}
+---------------------------------
+*VALOR TOTAL:* *${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}*
+*ID do Pedido:* #${result.orderId}
+`;
+
+                    // Adiciona este resumo como a *última* mensagem no chat para o atendente
+                    const messagesRef = db.collection('atendimentos').doc(atendimentoId).collection('mensagens');
+                    await messagesRef.add({
+                        texto: summaryMessage,
+                        origem: 'bot', // Identifica como mensagem do sistema/bot
+                        enviadaEm: Timestamp.now()
+                    });
+                    
+                    // ===================================
+                    // FIM DA NOVA FUNCIONALIDADE
+                    // ===================================
+
+                    // Agora envia a confirmação para o cliente
                     await enviarTexto(userNumber, botMessages.orderSuccess(result.orderId));
                     await deleteUserState(userNumber);
                     await new Promise(resolve => setTimeout(resolve, 2000));
                     await enviarMenuPrincipalComoLista(userNumber, {});
+
                 } else {
                     await enviarTexto(userNumber, botMessages.orderStockError(result.productName));
                     await updateUserState(userNumber, { ...userSession, state: 'AWAITING_CART_ACTION' });
