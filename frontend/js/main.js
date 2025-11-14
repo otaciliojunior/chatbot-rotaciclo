@@ -19,7 +19,7 @@ import { showSidebarPanel } from './ui.js';
 import { iniciarOuvinteDeAtendimentos, iniciarOuvinteDeContatos } from './listeners.js';
 
 // --- NOVA CONSTANTE DA API ---
-const API_URL = 'https://chatbot-rotaciclo.onrender.com/api';
+const API_URL = 'https://rotaciclo-api.onrender.com/api';
 
 // --- NOVA FUNÇÃO DE AUTENTICAÇÃO E CARREGAMENTO DE PERFIL ---
 async function autenticarECarregarPerfil() {

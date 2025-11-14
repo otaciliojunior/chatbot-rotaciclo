@@ -1,7 +1,7 @@
 // js/login.js
 
 // Define a URL da sua API backend
-const API_URL = 'https://chatbot-rotaciclo.onrender.com/api';
+const API_URL = 'https://rotaciclo-api.onrender.com/api';
 
 // --- Seletores do Formulário de Login ---
 const loginForm = document.getElementById('login-form');
