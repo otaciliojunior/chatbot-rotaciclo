@@ -481,11 +481,11 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
             const possibleProduct = Object.keys(productMap).find(fullName => 
                 originalMsg.endsWith('...') ? fullName.startsWith(originalMsg.slice(0, -3)) : fullName === originalMsg
             );
-            
+
             if (possibleProduct) { 
                 productId = productMap[possibleProduct]; 
-            } else if (msg.startsWith('add_')) {
-                productId = msg.split('add_')[1];
+            } else if (originalMsg.startsWith('add_')) { 
+                productId = originalMsg.split('add_')[1]; 
             }
             
             if (productId) {
