@@ -90,18 +90,32 @@ function getIntention(message) {
     return message;
 }
 
-async function encaminharParaAtendente(userNumber, atendimentoId, motivo) {
+async function encaminharParaAtendente(userNumber, atendimentoId, motivo, userMessage = null) {
     console.log(`[${userNumber}] Encaminhando para atendente. Motivo: ${motivo}`);
+    
+    if (userMessage) {
+        const messagesRef = db.collection('atendimentos').doc(atendimentoId).collection('mensagens');
+        await messagesRef.add({
+            texto: userMessage,
+            origem: 'cliente',
+            enviadaEm: Timestamp.now()
+        });
+    }
+
     await db.collection('atendimentos').doc(atendimentoId).update({ 
         motivo: motivo,
         status: 'aguardando',
         atendimentoIniciadoEm: Timestamp.now()
     });
+    
     await enviarTexto(userNumber, botMessages.humanHandoff);
     await deleteUserState(userNumber);
 }
 
 async function processarMensagem(userNumber, userName, userMessage, waId, referralData = null) {
+    
+    const originalMsg = typeof userMessage === 'string' ? userMessage.trim() : userMessage;
+    const msg = originalMsg.toLowerCase();
     
     if (referralData) {
         console.log(`[${userNumber}] Cliente chegou via Anúncio (CTW). Source ID: ${referralData.source_id || 'N/A'}`);
@@ -127,11 +141,20 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
 
         const adHeadline = referralData.headline || "Produto do Anúncio";
         const motivoHandoff = `Interesse via Anúncio: ${adHeadline}. (Mensagem: "${userMessage}")`;
+        
+        const messagesRef = db.collection('atendimentos').doc(atendimentoId).collection('mensagens');
+        await messagesRef.add({
+            texto: originalMsg,
+            origem: 'cliente',
+            enviadaEm: Timestamp.now()
+        });
+        
         await db.collection('atendimentos').doc(atendimentoId).update({ 
             motivo: motivoHandoff,
             status: 'aguardando',
             atendimentoIniciadoEm: Timestamp.now()
         });
+        
         await enviarTexto(userNumber, botMessages.adHandoff(userName));
         await deleteUserState(userNumber); 
         return; 
@@ -182,17 +205,8 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
     
     console.log(`[${userNumber}] Atendimento ativo ${atendimentoId} encontrado.`);
     
-    const messagesRef = db.collection('atendimentos').doc(atendimentoId).collection('mensagens');
-    await messagesRef.add({
-        texto: userMessage,
-        origem: 'cliente',
-        enviadaEm: Timestamp.now()
-    });
-    
     const atendimentoRef = db.collection('atendimentos').doc(atendimentoId);
     const userSession = await getUserState(userNumber) || {};
-    const originalMsg = typeof userMessage === 'string' ? userMessage.trim() : userMessage;
-    const msg = originalMsg.toLowerCase();
     let currentState = userSession.state || 'AWAITING_CHOICE';
     
     const docSnap = await atendimentoRef.get();
@@ -202,6 +216,13 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
         if ((currentStatus === 'em_atendimento' || currentStatus === 'aguardando' || currentStatus === 'em_atendimento_avisado') && currentState !== 'AWAITING_HUMAN_REQUEST_REASON') {
             console.log(`[${userNumber}] Atendimento com status '${currentStatus}'. Mensagem salva, sem resposta do bot.`);
             
+            const messagesRef = db.collection('atendimentos').doc(atendimentoId).collection('mensagens');
+            await messagesRef.add({
+                texto: originalMsg,
+                origem: 'cliente',
+                enviadaEm: Timestamp.now()
+            });
+
             let updateData = {
                 ultimaInteracao: Timestamp.now()
             };
@@ -253,7 +274,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
                 const servicosSnapshot = await servicosRef.get();
                 if (servicosSnapshot.empty) {
                     console.error(`[${userNumber}] ERRO: Coleção 'configuracoesServicos' está vazia.`);
-                    await encaminharParaAtendente(userNumber, atendimentoId, "Erro: 'configuracoesServicos' não encontrada no painel.");
+                    await encaminharParaAtendente(userNumber, atendimentoId, "Erro: 'configuracoesServicos' não encontrada no painel.", originalMsg);
                     break;
                 }
                 const servicosDisponiveis = [];
@@ -264,7 +285,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
                     await updateUserState(userNumber, { ...userSession, state: 'AWAITING_SCHEDULE_SERVICE_SELECTED' });
                     await enviarLista(userNumber, botMessages.askServiceType, "Tipos de Serviço", servicosDisponiveis);
                 } else {
-                    await encaminharParaAtendente(userNumber, atendimentoId, "Erro: Nenhum serviço configurado no painel.");
+                    await encaminharParaAtendente(userNumber, atendimentoId, "Erro: Nenhum serviço configurado no painel.", originalMsg);
                 }
             } else if (intention === "menu_ver_carrinho") {
                 await enviarResumoCarrinho(userNumber, userSession);
@@ -273,7 +294,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
                 await updateUserState(userNumber, { ...userSession, state: 'AWAITING_HUMAN_REQUEST_REASON' });
             } else {
                 const motivo = `Cliente enviou uma opção não reconhecida no menu principal: "${userMessage}"`;
-                await encaminharParaAtendente(userNumber, atendimentoId, motivo);
+                await encaminharParaAtendente(userNumber, atendimentoId, motivo, originalMsg);
             }
             break;
         }
@@ -293,7 +314,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
         
         case 'AWAITING_ILUMINACAO_HANDOFF_CONFIRMATION': {
             if (msg === 'sim') {
-                await encaminharParaAtendente(userNumber, atendimentoId, "Interesse em Peças: Iluminação");
+                await encaminharParaAtendente(userNumber, atendimentoId, "Interesse em Peças: Iluminação", "Sim");
             } else if (msg === 'nao') {
                 await enviarTexto(userNumber, botMessages.partsGoodbye);
                 userSession.state = 'AWAITING_CHOICE';
@@ -321,7 +342,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
         
         case 'AWAITING_CAMARAS_HANDOFF_CONFIRMATION': {
              if (msg === 'sim') {
-                await encaminharParaAtendente(userNumber, atendimentoId, "Interesse em Peças: Câmaras de Ar");
+                await encaminharParaAtendente(userNumber, atendimentoId, "Interesse em Peças: Câmaras de Ar", "Sim");
             } else if (msg === 'nao') {
                 await enviarTexto(userNumber, botMessages.partsGoodbye);
                 userSession.state = 'AWAITING_CHOICE';
@@ -341,7 +362,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
                 await enviarTexto(userNumber, botMessages.pneuSizeConfirmation(aroSelecionado));
                 await new Promise(resolve => setTimeout(resolve, 1500));
                 const motivo = `Interesse em Peças: Pneus (Aro ${aroSelecionado})`;
-                await encaminharParaAtendente(userNumber, atendimentoId, motivo);
+                await encaminharParaAtendente(userNumber, atendimentoId, motivo, originalMsg);
             } else { await enviarTexto(userNumber, botMessages.invalidOption); }
             break;
         }
@@ -353,7 +374,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
 
             if (!servicoDoc.exists) {
                 await enviarTexto(userNumber, botMessages.invalidOption);
-                await encaminharParaAtendente(userNumber, atendimentoId, `Tentativa de agendar serviço inexistente: ${servicoNome}`);
+                await encaminharParaAtendente(userNumber, atendimentoId, `Tentativa de agendar serviço inexistente: ${servicoNome}`, originalMsg);
                 break;
             }
 
@@ -364,7 +385,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
 
             if (diasDisponiveis.length === 0) {
                 await enviarTexto(userNumber, botMessages.noSchedulesFoundForService(servicoNome));
-                await encaminharParaAtendente(userNumber, atendimentoId, `Serviço ${servicoNome} sem dias configurados.`);
+                await encaminharParaAtendente(userNumber, atendimentoId, `Serviço ${servicoNome} sem dias configurados.`, originalMsg);
                 break;
             }
 
@@ -439,7 +460,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
                     await enviarMenuPrincipalComoLista(userNumber, userSession);
                 } catch (error) {
                     console.error(`[${userNumber}] Erro ao criar agendamento:`, error);
-                    await encaminharParaAtendente(userNumber, atendimentoId, "Falha ao criar agendamento no Firestore");
+                    await encaminharParaAtendente(userNumber, atendimentoId, "Falha ao criar agendamento no Firestore", originalMsg);
                 }
             } else {
                 await enviarTexto(userNumber, botMessages.invalidTime);
@@ -449,11 +470,20 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
 
         case 'AWAITING_HUMAN_REQUEST_REASON': {
             const motivo = userMessage;
+            
+            const messagesRef = db.collection('atendimentos').doc(atendimentoId).collection('mensagens');
+            await messagesRef.add({
+                texto: motivo,
+                origem: 'cliente',
+                enviadaEm: Timestamp.now()
+            });
+
             await db.collection('atendimentos').doc(atendimentoId).update({ 
                 motivo: motivo, 
                 status: 'aguardando',
                 atendimentoIniciadoEm: Timestamp.now()
             });
+            
             await enviarTexto(userNumber, botMessages.humanRequestSuccess); 
             console.log(`[${userNumber}] Motivo do atendimento ${atendimentoId} atualizado para: "${motivo}"`);
             await deleteUserState(userNumber);
@@ -466,10 +496,10 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
             if (msg === 'bike_mtb') bikeType = 'mtb';
             if (msg === 'bike_passeio') bikeType = 'passeio';
             if (bikeType) {
-                await enviarCatalogoDeProdutos(userNumber, userSession, bikeType, atendimentoId);
+                await enviarCatalogoDeProdutos(userNumber, userSession, bikeType, atendimentoId, originalMsg);
             } else {
                 const motivo = `Cliente selecionou um tipo de bike inválido: "${userMessage}"`;
-                await encaminharParaAtendente(userNumber, atendimentoId, motivo);
+                await encaminharParaAtendente(userNumber, atendimentoId, motivo, originalMsg);
             }
             break;
         }
@@ -524,18 +554,18 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
                     } else {
                         console.error(`[${userNumber}] Produto com ID ${productId} não encontrado no Firestore.`);
                         const motivo = `Tentativa de adicionar produto com ID inexistente: ${productId}`;
-                        await encaminharParaAtendente(userNumber, atendimentoId, motivo);
+                        await encaminharParaAtendente(userNumber, atendimentoId, motivo, originalMsg);
                     }
                     
                 } catch (error) {
                     console.error(`[${userNumber}] Erro crítico ao buscar/adicionar produto ${productId}:`, error);
                     const motivo = `Erro técnico ao adicionar produto ao carrinho. (Ref: ${productId})`;
-                    await encaminharParaAtendente(userNumber, atendimentoId, motivo);
+                    await encaminharParaAtendente(userNumber, atendimentoId, motivo, originalMsg);
                 }
                 
             } else {
                 const motivo = `Cliente tentou adicionar um produto inválido ao carrinho: "${userMessage}"`;
-                await encaminharParaAtendente(userNumber, atendimentoId, motivo);
+                await encaminharParaAtendente(userNumber, atendimentoId, motivo, originalMsg);
             }
             break;
         }
@@ -545,7 +575,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
                 await enviarResumoCarrinho(userNumber, userSession);
             } else {
                 const motivo = `Cliente escolheu uma opção inválida após adicionar item ao carrinho: "${userMessage}"`;
-                await encaminharParaAtendente(userNumber, atendimentoId, motivo);
+                await encaminharParaAtendente(userNumber, atendimentoId, motivo, originalMsg);
             }
             break;
         }
@@ -561,7 +591,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
                 await enviarMenuPrincipalComoLista(userNumber, userSession);
             } else {
                 const motivo = `Cliente escolheu uma ação inválida no carrinho: "${userMessage}"`;
-                await encaminharParaAtendente(userNumber, atendimentoId, motivo);
+                await encaminharParaAtendente(userNumber, atendimentoId, motivo, originalMsg);
             }
             break;
         }
@@ -629,7 +659,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
                 console.error("Erro ao criar pedido:", error);
                 await enviarTexto(userNumber, botMessages.orderError);
                 const motivo = `Erro técnico ao finalizar o pedido. Erro: ${error.message}`;
-                await encaminharParaAtendente(userNumber, atendimentoId, motivo);
+                await encaminharParaAtendente(userNumber, atendimentoId, motivo, originalMsg);
             }
             break;
         }
@@ -705,7 +735,7 @@ async function criarAgendamento(userNumber, userName, agendamentoInfo) {
     console.log(`[${userNumber}] Agendamento ${agendamentoRef.id} criado com sucesso.`);
     return agendamentoRef;
 }
-async function enviarCatalogoDeProdutos(userNumber, userSession, bikeType, atendimentoId) {
+async function enviarCatalogoDeProdutos(userNumber, userSession, bikeType, atendimentoId, originalMsg) {
     try {
         const produtosRef = db.collection('produtos');
         const q = produtosRef.where('categoria', '==', bikeType);
@@ -735,7 +765,7 @@ async function enviarCatalogoDeProdutos(userNumber, userSession, bikeType, atend
     } catch (error) {
         console.error(`[${userNumber}] Falha crítica ao buscar catálogo de '${bikeType}'. Erro:`, error);
         const motivo = `Erro técnico ao buscar produtos de ${bikeType}.`;
-        await encaminharParaAtendente(userNumber, atendimentoId, motivo);
+        await encaminharParaAtendente(userNumber, atendimentoId, motivo, originalMsg);
     }
 }
 async function enviarResumoCarrinho(userNumber, userSession) {
