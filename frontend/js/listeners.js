@@ -1,6 +1,6 @@
 import { db, collection, query, where, onSnapshot, orderBy } from './firebase.js';
 import * as dom from './dom.js';
-import { criarElementoChat } from './chatList.js';
+import { criarElementoChat, atualizarPreviewChatList } from './chatList.js';
 import { setAtendimentoData, deleteAtendimentoData } from './state.js';
 
 export function iniciarOuvinteDeAtendimentos() {
@@ -26,12 +26,9 @@ export function iniciarOuvinteDeAtendimentos() {
 
             if (change.type === "modified") {
                 console.log("Atendimento modificado:", atendimentoId, atendimentoData);
-                const chatElementExistente = dom.chatListContainer.querySelector(`.chat-contact[data-chat-id="${atendimentoId}"]`);
-                if (chatElementExistente) {
-                    chatElementExistente.remove();
-                }
-                const chatElementAtualizado = criarElementoChat(atendimentoId, atendimentoData);
-                dom.chatListContainer.prepend(chatElementAtualizado); 
+                const novoMotivo = atendimentoData.motivo || "Nova conversa...";
+                const novoTimestamp = atendimentoData.ultimaInteracao || atendimentoData.solicitadoEm;
+                atualizarPreviewChatList(atendimentoId, novoMotivo, novoTimestamp);
             }
 
             if (change.type === "removed") {
