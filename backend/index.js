@@ -90,12 +90,12 @@ app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'healthy', message: 'Servidor acordado.' });
 });
 
-app.post('/api/run-inactivity-check', async (req, res) => {
+app.head('/api/run-inactivity-check', async (req, res) => {
     const providedSecret = req.query.secret;
 
     if (!providedSecret || providedSecret !== process.env.CRON_SECRET) {
         console.warn('CRON: Tentativa de acesso não autorizada ao cron job.');
-        return res.status(401).json({ message: 'Não autorizado.' });
+        return res.status(401).end();
     }
 
     try {
@@ -103,11 +103,11 @@ app.post('/api/run-inactivity-check', async (req, res) => {
             console.error("CRON: Erro não tratado na verificação de inatividade:", err);
         });
         
-        res.status(202).json({ message: 'Verificação de inatividade iniciada.' });
+        res.status(202).end();
 
     } catch (error) {
         console.error("CRON: Erro ao iniciar verificação:", error);
-        res.status(500).json({ message: 'Erro interno.' });
+        res.status(500).end();
     }
 });
 
