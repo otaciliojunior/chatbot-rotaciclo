@@ -24,7 +24,7 @@ const botMessages = {
     productCaption: (bike) => `*${bike.nome}*\n\n${bike.descricao || 'Descrição não informada.'}\n\n*Preço:* ${bike.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n*Estoque:* ${bike.estoque || 'Consultar'} unidade(s)`,
     noBikesFound: (bikeType) => `Poxa, no momento estamos sem bikes na categoria *${bikeType}*. 😕\n\nDigite 'menu' para ver outras opções.`,
     productOutOfStock: (productName) => `Poxa, o item *${productName}* acabou de esgotar em nosso estoque! 😕\n\nVamos voltar ao menu para você escolher outro modelo, combinado?`,
-    addToCartPrompt: "Qual destes models você gostaria de adicionar ao carrinho?",
+    addToCartPrompt: "Qual destes modelos você gostaria de adicionar ao carrinho?",
     itemAddedToCart: (productName) => `✅ *${productName}* foi adicionado ao seu carrinho!`,
     afterAddToCartOptions: "Legal! O que você gostaria de fazer agora?",
     cartHeader: "🛒 *Seu Carrinho de Compras*",
@@ -477,6 +477,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
         case 'AWAITING_PRODUCT_SELECTION_FOR_CART': {
             const productMap = userSession.displayedProducts || {};
             let productId = null;
+            
             const possibleProduct = Object.keys(productMap).find(fullName => 
                 originalMsg.endsWith('...') ? fullName.startsWith(originalMsg.slice(0, -3)) : fullName === originalMsg
             );
@@ -488,32 +489,50 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
             }
             
             if (productId) {
-                const productRef = db.collection('produtos').doc(productId);
-                const productSnap = await productRef.get();
-                if (productSnap.exists) {
-                    const productData = productSnap.data();
-                    if (productData.estoque && productData.estoque > 0) {
-                        if (!userSession.cart) userSession.cart = [];
-                        const itemNoCarrinho = userSession.cart.find(item => item.productId === productId);
-                        if (itemNoCarrinho) {
-                            itemNoCarrinho.quantidade++;
+                try {
+                    const productRef = db.collection('produtos').doc(productId);
+                    const productSnap = await productRef.get();
+                    
+                    if (productSnap.exists) {
+                        const productData = productSnap.data();
+                        
+                        if (productData.estoque && productData.estoque > 0) {
+                            if (!userSession.cart) userSession.cart = [];
+                            const itemNoCarrinho = userSession.cart.find(item => item.productId === productId);
+                            
+                            if (itemNoCarrinho) {
+                                itemNoCarrinho.quantidade++;
+                            } else {
+                                userSession.cart.push({ productId: productId, nome: productData.nome, preco: productData.preco, quantidade: 1 });
+                            }
+                            
+                            delete userSession.displayedProducts;
+                            await updateUserState(userNumber, { ...userSession, state: 'AWAITING_POST_ADD_ACTION' });
+                            await enviarTexto(userNumber, botMessages.itemAddedToCart(productData.nome));
+                            
+                            const botoesPosCarrinho = [ { id: "view_cart", title: "🛒 Ver Carrinho" }, { id: "continue_shopping", title: "Continuar a Comprar" } ];
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                            await enviarBotoes(userNumber, botMessages.afterAddToCartOptions, botoesPosCarrinho);
+                            
                         } else {
-                            userSession.cart.push({ productId: productId, nome: productData.nome, preco: productData.preco, quantidade: 1 });
+                            await enviarTexto(userNumber, botMessages.productOutOfStock(productData.nome));
+                            delete userSession.displayedProducts;
+                            await updateUserState(userNumber, userSession);
+                            await new Promise(resolve => setTimeout(resolve, 1500));
+                            await enviarMenuPrincipalComoLista(userNumber, userSession);
                         }
-                        delete userSession.displayedProducts;
-                        await updateUserState(userNumber, { ...userSession, state: 'AWAITING_POST_ADD_ACTION' });
-                        await enviarTexto(userNumber, botMessages.itemAddedToCart(productData.nome));
-                        const botoesPosCarrinho = [ { id: "view_cart", title: "🛒 Ver Carrinho" }, { id: "continue_shopping", title: "Continuar a Comprar" } ];
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        await enviarBotoes(userNumber, botMessages.afterAddToCartOptions, botoesPosCarrinho);
                     } else {
-                        await enviarTexto(userNumber, botMessages.productOutOfStock(productData.nome));
-                        delete userSession.displayedProducts;
-                        await updateUserState(userNumber, userSession);
-                        await new Promise(resolve => setTimeout(resolve, 1500));
-                        await enviarMenuPrincipalComoLista(userNumber, userSession);
+                        console.error(`[${userNumber}] Produto com ID ${productId} não encontrado no Firestore.`);
+                        const motivo = `Tentativa de adicionar produto com ID inexistente: ${productId}`;
+                        await encaminharParaAtendente(userNumber, atendimentoId, motivo);
                     }
+                    
+                } catch (error) {
+                    console.error(`[${userNumber}] Erro crítico ao buscar/adicionar produto ${productId}:`, error);
+                    const motivo = `Erro técnico ao adicionar produto ao carrinho. (Ref: ${productId})`;
+                    await encaminharParaAtendente(userNumber, atendimentoId, motivo);
                 }
+                
             } else {
                 const motivo = `Cliente tentou adicionar um produto inválido ao carrinho: "${userMessage}"`;
                 await encaminharParaAtendente(userNumber, atendimentoId, motivo);
