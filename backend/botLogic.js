@@ -1,11 +1,14 @@
-// js/botLogic.js (CORRIGIDO)
+// /backend/botLogic.js
 
 const { Timestamp, FieldValue } = require('firebase-admin/firestore');
 const { db, getUserState, updateUserState, deleteUserState } = require('./firestoreService');
-// CORRIGIDO: 'enviarImagem' -> 'enviarImagemComLegenda'
-const { enviarTexto, enviarLista, enviarBotoes, enviarImagemComLegenda, buscarDadosDePerfil } = require('./whatsappClient');
+const { 
+    enviarTexto, 
+    enviarLista, 
+    enviarBotoes, 
+    enviarImagemComLegenda 
+} = require('./whatsappClient');
 
-// ... (todo o resto do arquivo, botMessages, diasFormatados, getIntention, etc. permanece igual) ...
 const botMessages = {
     welcomeFirstTime: (userName) => `Fala, ${userName}! Bem-vindo(a) à *Rota Ciclo*! Esse é nosso novo canal de atendimento automático, feito para deixar sua experiência mais prática e aproximar você ainda mais da nossa loja. Bora pedalar junto nessa nova rota? 🚴🏼`,
     welcomeReturn: (userName) => `Fala, ${userName}! Bem-vindo(a) de volta à *Rota Ciclo*!`,
@@ -108,9 +111,9 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
         const q = atendimentosRef.where('cliente_id', '==', userNumber).orderBy('solicitadoEm', 'desc').limit(1);
         const snapshot = await q.get();
         let atendimentoId;
+
         if (snapshot.empty) {
-            const profileData = await buscarDadosDePerfil(waId);
-            const fotoUrl = profileData ? profileData.profile_picture_url : null;
+            const fotoUrl = null;
             const newAtendimentoRef = await atendimentosRef.add({
                 cliente_id: userNumber,
                 cliente_nome: userName,
@@ -123,6 +126,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
         } else {
             atendimentoId = snapshot.docs[0].id;
         }
+
         const adHeadline = referralData.headline || "Produto do Anúncio";
         const motivoHandoff = `Interesse via Anúncio: ${adHeadline}. (Mensagem: "${userMessage}")`;
         await db.collection('atendimentos').doc(atendimentoId).update({ 
@@ -158,8 +162,8 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
             console.log(`[${userNumber}] Cliente ${userName} retornou após atendimento resolvido.`);
             await enviarTexto(userNumber, botMessages.welcomeReturn(userName));
         }
-        const profileData = await buscarDadosDePerfil(waId);
-        const fotoUrl = profileData ? profileData.profile_picture_url : null;
+
+        const fotoUrl = null;
         const newAtendimentoRef = await atendimentosRef.add({
             cliente_id: userNumber,
             cliente_nome: userName,
@@ -170,6 +174,7 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
             motivo: userMessage
         });
         atendimentoId = newAtendimentoRef.id;
+
         console.log(`[${userNumber}] Novo atendimento ${atendimentoId} criado.`);
         await updateUserState(userNumber, { state: 'AWAITING_CHOICE' });
         await new Promise(resolve => setTimeout(resolve, 1500));
@@ -665,8 +670,7 @@ async function enviarCatalogoDeProdutos(userNumber, userSession, bikeType, atend
             produtosParaAdicionar.push({ id: `add_${doc.id}`, title: tituloCurto });
             productMap[produto.nome] = doc.id; 
             const legenda = botMessages.productCaption(produto);
-
-            // CORRIGIDO: 'enviarImagem' -> 'enviarImagemComLegenda'
+            
             await enviarImagemComLegenda(userNumber, produto.imagemUrl, legenda);
             
             await new Promise(resolve => setTimeout(resolve, 1000));
