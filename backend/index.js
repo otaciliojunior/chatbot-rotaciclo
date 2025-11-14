@@ -316,7 +316,7 @@ async function checkHumanInactivity() {
             const lastMsg = ultimasMensagensSnap.docs[0].data();
             const lastMsgTime = lastMsg.enviadaEm.toMillis();
 
-            if (lastMsg.origem === 'agente' && lastMsgTime < encerramentoThreshold) {
+            if (lastMsg.origem === 'atendente' && lastMsgTime < encerramentoThreshold) {
                 const clienteId = doc.data().cliente_id;
                 console.log(`[ENCERRAR] Chat ${doc.id} (Cliente: ${clienteId}) excedeu limite. Encerrando.`);
                 
