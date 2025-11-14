@@ -117,20 +117,14 @@ export async function abrirChat(chatId) {
     
     const messagesRef = collection(db, "atendimentos", chatId, "mensagens");
 
-    // --- INÍCIO DA CORREÇÃO (chat.js) ---
-    // Agora usamos o 'atendimentoIniciadoEm' que o backend salvou.
-    // Se não existir (em chats antigos), ele usa 'solicitadoEm' como fallback.
     const timestampInicio = chat.atendimentoIniciadoEm || chat.solicitadoEm; 
     
     if (!chat.atendimentoIniciadoEm) {
         console.warn(`[${chatId}] 'atendimentoIniciadoEm' não encontrado. Usando 'solicitadoEm' como fallback.`);
     }
-    // --- FIM DA CORREÇÃO ---
 
     const historyQuery = query(
         messagesRef, 
-        // Este filtro agora usará o timestamp correto (ex: 14:03)
-        // e irá esconder "menu_atendente" (14:02)
         where("enviadaEm", ">=", timestampInicio || new Date(0)), 
         orderBy("enviadaEm", "desc"), 
         limit(30)
@@ -146,26 +140,22 @@ export async function abrirChat(chatId) {
         msg.id = doc.id; 
 
         const msgTimestamp = msg.enviadaEm;
-        // Usamos o 'atendimentoIniciadoEm' para a comparação
         const inicioTimestamp = chat.atendimentoIniciadoEm;
 
-        // --- INÍCIO DA CORREÇÃO (Filtro de Duplicata) ---
-        // Compara o timestamp da mensagem com o 'atendimentoIniciadoEm'.
-        // Como ambos são definidos (quase) ao mesmo tempo, a função 'isEqual'
-        // agora vai funcionar e esconder a bolha de mensagem duplicada.
-        if (msg.origem === 'cliente' && 
-            msgTimestamp && 
-            inicioTimestamp && 
-            typeof msgTimestamp.isEqual === 'function' && 
-            msgTimestamp.isEqual(inicioTimestamp)) 
+        if (msg.origem === 'cliente' &&
+            chat.motivo && msg.texto === chat.motivo &&
+            msgTimestamp &&
+            inicioTimestamp &&
+            typeof msgTimestamp.toMillis === 'function' &&
+            (msgTimestamp.toMillis() - inicioTimestamp.toMillis() >= 0) &&
+            (msgTimestamp.toMillis() - inicioTimestamp.toMillis()) < 2000)
         {
-            console.log("Filtrando mensagem 'motivo' duplicada (por timestamp):", msg.texto);
+            console.log("Filtrando mensagem 'motivo' duplicada (por texto e janela de tempo):", msg.texto);
             if (!firstMessageTimestamp) {
                 firstMessageTimestamp = msg.enviadaEm;
             }
-            continue; // Pula a renderização
+            continue; 
         }
-        // --- FIM DA CORREÇÃO ---
 
         renderizarMensagemNaTela(msg); 
         if (!firstMessageTimestamp) {
