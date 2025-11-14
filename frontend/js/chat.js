@@ -6,7 +6,7 @@ import { db, collection, query, where, onSnapshot, orderBy, addDoc, serverTimest
 import { popularInfoPanel } from './crmPanel.js';
 import { atualizarPreviewChatList } from './chatList.js';
 
-const API_BACKEND_URL = 'http://localhost:3000/api/enviar-mensagem';
+const API_BACKEND_URL = 'https://rotaciclo-api.onrender.com/api/enviar-mensagem';
 
 let attachedFile = null; 
 let unsubscribeMessages = null; 
