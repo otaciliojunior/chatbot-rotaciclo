@@ -12,7 +12,7 @@ const botMessages = {
     welcomeReturn: (userName) => `Fala, ${userName}! Bem-vindo(a) de volta à *Rota Ciclo*!`,
     invalidOption: "Ops, não entendi essa opção 🤔. Tenta clicar em uma das opções do menu, beleza?",
     thankYou: "Beleza! Se precisar de mais alguma coisa, é só chamar.",
-    mainMenuHeader: "*Escolha a opção* que mais combina com o que você precisa e eu te ajudo rapidinho! Se quiser voltar pro menu depois, é só digitar *Menu*. 😉",
+    mainMenuHeader: "*Por favor, selecione a opção* que melhor representa a sua necessidade.\n\nPara retornar ao menu principal a qualquer momento, digite *Menu*. 😉",
     askBikeType: "Boa escolha! 🚴 Temos bikes pra todo tipo de rolê. Qual categoria você procura?",
     askPartsCategory: "Certo! Sobre qual categoria de peças e acessórios você gostaria de saber?", 
     askIluminacaoHandoff: "Você deseja falar com um atendente para finalizar a compra ou saber mais informações do produto?",
@@ -588,10 +588,6 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
                 
                 if (result.success) {
                     
-                    // ===================================
-                    // INÍCIO DA NOVA FUNCIONALIDADE
-                    // ===================================
-                    
                     const { cart, checkoutData } = userSession;
                     let total = 0;
                     const itemsResumo = cart.map(item => {
@@ -601,36 +597,27 @@ async function processarMensagem(userNumber, userName, userMessage, waId, referr
                     
                     const paymentMethod = checkoutData.payment.replace('payment_', '').toUpperCase();
 
-                    const summaryMessage = `🧾 *RESUMO DO NOVO PEDIDO* 🧾
----------------------------------
-*Cliente:* ${checkoutData.name}
-*Endereço:* ${checkoutData.address}
-*Pagamento:* ${paymentMethod}
----------------------------------
-*Itens do Pedido:*
-${itemsResumo}
----------------------------------
-*VALOR TOTAL:* *${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}*
-*ID do Pedido:* #${result.orderId}
-`;
+                    const summaryMessage = `🧾 *RESUMO DO NOVO PEDIDO* 🧾\n` +
+                                         `---------------------------------\n` +
+                                         `*Cliente:* ${checkoutData.name}\n` +
+                                         `*Endereço:* ${checkoutData.address}\n` +
+                                         `*Pagamento:* ${paymentMethod}\n` +
+                                         `---------------------------------\n` +
+                                         `*Itens do Pedido:*\n` +
+                                         `${itemsResumo}\n` +
+                                         `---------------------------------\n` +
+                                         `*VALOR TOTAL:* *${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}*\n` +
+                                         `*ID do Pedido:* #${result.orderId}`;
 
-                    // Adiciona este resumo como a *última* mensagem no chat para o atendente
                     const messagesRef = db.collection('atendimentos').doc(atendimentoId).collection('mensagens');
                     await messagesRef.add({
                         texto: summaryMessage,
-                        origem: 'bot', // Identifica como mensagem do sistema/bot
+                        origem: 'bot',
                         enviadaEm: Timestamp.now()
                     });
                     
-                    // ===================================
-                    // FIM DA NOVA FUNCIONALIDADE
-                    // ===================================
-
-                    // Agora envia a confirmação para o cliente
                     await enviarTexto(userNumber, botMessages.orderSuccess(result.orderId));
-                    await deleteUserState(userNumber);
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    await enviarMenuPrincipalComoLista(userNumber, {});
+                    await deleteUserState(userNumber); 
 
                 } else {
                     await enviarTexto(userNumber, botMessages.orderStockError(result.productName));
@@ -779,6 +766,7 @@ async function criarPedidoEnotificarAdmin(userNumber, userName, userSession, ate
     return db.runTransaction(async (transaction) => {
         const productRefs = cart.map(item => db.collection('produtos').doc(item.productId));
         const productDocs = await transaction.getAll(...productRefs);
+        
         for (let i = 0; i < productDocs.length; i++) {
             const productDoc = productDocs[i];
             const item = cart[i];
@@ -791,13 +779,16 @@ async function criarPedidoEnotificarAdmin(userNumber, userName, userSession, ate
                 throw error;
             }
         }
+        
         for (let i = 0; i < productDocs.length; i++) {
             const productRef = productRefs[i];
             const item = cart[i];
             transaction.update(productRef, { estoque: FieldValue.increment(-item.quantidade) });
         }
+        
         let total = 0;
         cart.forEach(item => total += item.preco * item.quantidade);
+        
         const novoPedido = {
             cliente_id: userNumber,
             cliente_nome_chat: userName,
@@ -809,24 +800,36 @@ async function criarPedidoEnotificarAdmin(userNumber, userName, userSession, ate
             status_pedido: 'recebido',
             criadoEm: Timestamp.now()
         };
+        
         const pedidoRef = db.collection('pedidos').doc();
         transaction.set(pedidoRef, novoPedido);
-        const resumoPedidoParaCRM = cart.map(item => `${item.quantidade}x ${item.nome}`).join(', ');
-        const motivo = `NOVO PEDIDO #${pedidoRef.id.substring(0, 5)} - ${resumoPedidoParaCRM}`;
         
+        const orderIdShort = pedidoRef.id.substring(0, 5).toUpperCase();
+        const paymentMethod = checkoutData.payment.replace('payment_', '').toUpperCase();
+        const itemsSummary = cart.map(item => `${item.quantidade}x ${item.nome}`).join(', ');
+
+        const newMotivo = `NOVO PEDIDO #${orderIdShort}\n` +
+                        `Cliente: ${checkoutData.name}\n` +
+                        `Endereço: ${checkoutData.address}\n` +
+                        `Pagamento: ${paymentMethod}\n` +
+                        `Itens: ${itemsSummary}\n` +
+                        `Total: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
+
         const docAtendimentoRef = db.collection('atendimentos').doc(atendimentoId);
+        
         transaction.update(docAtendimentoRef, { 
-            motivo: motivo, 
+            motivo: newMotivo, 
             cliente_nome: checkoutData.name,
-            status: 'resolvido'
+            status: 'aguardando'
         });
         
         return { 
             success: true, 
-            orderId: pedidoRef.id.substring(0, 5).toUpperCase(),
+            orderId: orderIdShort,
             totalValue: total,
-            itemsSummary: resumoPedidoParaCRM
+            itemsSummary: itemsSummary
         };
+
     }).catch(error => {
         console.error(`[${userNumber}] Falha na transação de criação de pedido:`, error.message);
         if (error.isStockError) {
